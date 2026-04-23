@@ -53,6 +53,13 @@
             
             document.getElementById('btn-' + tab).classList.add('active');
             document.getElementById(tab + '-panel').classList.add('active');
+            
+            // 切换到记录标签时，清空查看结果
+            if (tab === 'record') {
+                document.getElementById('notes-list').innerHTML = '<p class="empty-tip">请选择时间范围后点击查询</p>';
+                document.getElementById('start-date').value = '';
+                document.getElementById('end-date').value = '';
+            }
         }
         
         // 提交笔记
