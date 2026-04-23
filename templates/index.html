@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>快速笔记</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>快速笔记</h1>
+        
+        <div class="tab-buttons">
+            <button id="btn-record" class="tab-btn active" onclick="showTab('record')">记录</button>
+            <button id="btn-view" class="tab-btn" onclick="showTab('view')">查看</button>
+        </div>
+        
+        <!-- 记录面板 -->
+        <div id="record-panel" class="panel active">
+            <div class="input-group">
+                <textarea id="note-input" placeholder="在此记录你的想法..." rows="6"></textarea>
+            </div>
+            <button class="action-btn" onclick="submitNote()">记录</button>
+            <div id="record-message" class="message"></div>
+        </div>
+        
+        <!-- 查看面板 -->
+        <div id="view-panel" class="panel">
+            <div class="quick-filters">
+                <button class="quick-btn" onclick="setQuickFilter('today')">当天</button>
+                <button class="quick-btn" onclick="setQuickFilter('week')">近7天</button>
+                <button class="quick-btn" onclick="setQuickFilter('month')">近30天</button>
+                <button class="quick-btn" onclick="setQuickFilter('all')">全部</button>
+            </div>
+            <div class="filter-group">
+                <label>开始日期:</label>
+                <input type="date" id="start-date">
+                <label>结束日期:</label>
+                <input type="date" id="end-date">
+                <button class="action-btn" onclick="queryNotes()">查询</button>
+            </div>
+            <div id="notes-list" class="notes-list">
+                <p class="empty-tip">请选择时间范围后点击查询</p>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // 切换标签页
+        function showTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.panel').forEach(panel => panel.classList.remove('active'));
+            
+            document.getElementById('btn-' + tab).classList.add('active');
+            document.getElementById(tab + '-panel').classList.add('active');
+        }
+        
+        // 提交笔记
+        async function submitNote() {
+            const input = document.getElementById('note-input');
+            const content = input.value.trim();
+            const messageDiv = document.getElementById('record-message');
+            
+            if (!content) {
+                showMessage(messageDiv, '请输入内容', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/notes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content })
+                });
+                
+                if (response.ok) {
+                    showMessage(messageDiv, '记录成功！', 'success');
+                    input.value = '';
+                } else {
+                    showMessage(messageDiv, '记录失败，请重试', 'error');
+                }
+            } catch (err) {
+                showMessage(messageDiv, '网络错误，请重试', 'error');
+            }
+        }
+        
+        // 查询笔记
+        async function queryNotes() {
+            const startDate = document.getElementById('start-date').value;
+            const endDate = document.getElementById('end-date').value;
+            const notesList = document.getElementById('notes-list');
+            
+            let url = '/api/notes';
+            const params = [];
+            if (startDate) params.push(`start_date=${startDate}`);
+            if (endDate) params.push(`end_date=${endDate}`);
+            if (params.length > 0) url += '?' + params.join('&');
+            
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data.notes.length === 0) {
+                    notesList.innerHTML = '<p class="empty-tip">没有找到符合条件的笔记</p>';
+                    return;
+                }
+                
+                notesList.innerHTML = data.notes.map(note => `
+                    <div class="note-item">
+                        <div class="note-time">${note.timestamp}</div>
+                        <div class="note-content">${escapeHtml(note.content)}</div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                notesList.innerHTML = '<p class="empty-tip" style="color: #e74c3c;">查询失败，请重试</p>';
+            }
+        }
+        
+        // 显示消息
+        function showMessage(element, text, type) {
+            element.textContent = text;
+            element.className = 'message ' + type;
+            setTimeout(() => {
+                element.textContent = '';
+                element.className = 'message';
+            }, 3000);
+        }
+        
+        // HTML转义
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // 设置默认日期为今天
+        document.addEventListener('DOMContentLoaded', () => {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('end-date').value = today;
+        });
+        
+        // 快捷筛选
+        function setQuickFilter(type) {
+            const today = new Date();
+            const todayStr = today.toISOString().split('T')[0];
+            const startDateInput = document.getElementById('start-date');
+            const endDateInput = document.getElementById('end-date');
+            
+            switch(type) {
+                case 'today':
+                    startDateInput.value = todayStr;
+                    endDateInput.value = todayStr;
+                    break;
+                case 'week':
+                    const weekAgo = new Date(today);
+                    weekAgo.setDate(today.getDate() - 6);
+                    startDateInput.value = weekAgo.toISOString().split('T')[0];
+                    endDateInput.value = todayStr;
+                    break;
+                case 'month':
+                    const monthAgo = new Date(today);
+                    monthAgo.setDate(today.getDate() - 29);
+                    startDateInput.value = monthAgo.toISOString().split('T')[0];
+                    endDateInput.value = todayStr;
+                    break;
+                case 'all':
+                    startDateInput.value = '';
+                    endDateInput.value = '';
+                    break;
+            }
+            
+            // 自动触发查询
+            queryNotes();
+        }
+    </script>
+</body>
+</html>
