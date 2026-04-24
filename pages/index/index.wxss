@@ -1,0 +1,167 @@
+/* Tab 切换 */
+.tab-bar {
+  display: flex;
+  background: white;
+  border-radius: 20rpx;
+  margin-bottom: 20rpx;
+  overflow: hidden;
+  box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.1);
+}
+
+.tab-item {
+  flex: 1;
+  text-align: center;
+  padding: 30rpx;
+  font-size: 32rpx;
+  font-weight: 500;
+  color: #666;
+  background: #f8f9fa;
+  transition: all 0.3s;
+}
+
+.tab-item.active {
+  background: white;
+  color: var(--primary);
+  border-bottom: 4rpx solid var(--primary);
+}
+
+/* 面板 */
+.panel {
+  min-height: 600rpx;
+}
+
+/* 语音输入相关 */
+.record-controls {
+  display: flex;
+  gap: 20rpx;
+  align-items: center;
+}
+
+.voice-btn {
+  width: 100rpx;
+  height: 100rpx;
+  border-radius: 50%;
+  border: 4rpx solid var(--primary);
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s;
+  flex-shrink: 0;
+}
+
+.voice-btn.voice-mode {
+  border-color: var(--success);
+  background: #f0fff0;
+}
+
+.voice-btn.recording {
+  border-color: var(--danger);
+  background: var(--danger);
+  animation: pulse 1s infinite;
+}
+
+.voice-icon-text {
+  font-size: 40rpx;
+  line-height: 1;
+}
+
+.voice-hint {
+  text-align: center;
+  font-size: 26rpx;
+  color: #888;
+  margin-top: 16rpx;
+}
+
+/* 消息提示 */
+.message {
+  margin-top: 20rpx;
+  padding: 20rpx;
+  border-radius: 12rpx;
+  text-align: center;
+  font-size: 28rpx;
+}
+
+.message.success {
+  background: #d4edda;
+  color: #155724;
+}
+
+.message.error {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+/* 筛选区域 */
+.filter-section {
+  margin-bottom: 24rpx;
+}
+
+.filter-label {
+  font-size: 28rpx;
+  color: #666;
+  font-weight: 500;
+  margin-bottom: 16rpx;
+}
+
+.filter-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.filter-tags .tag {
+  transition: all 0.3s;
+}
+
+.filter-tags .tag.active {
+  background: var(--primary);
+  color: white;
+}
+
+/* 批量操作栏 */
+.batch-actions {
+  padding: 20rpx;
+  background: #f0f7ff;
+  border-radius: 16rpx;
+}
+
+/* 面板 */
+.panel {
+  max-height: calc(100vh - 200rpx);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 笔记列表 */
+.notes-list {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.note-header {
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.note-content {
+  font-size: 30rpx;
+  color: #333;
+  line-height: 1.6;
+  word-wrap: break-word;
+}
+
+.action-link {
+  padding: 4rpx 16rpx;
+  border: 1rpx solid var(--primary);
+  background: transparent;
+  color: var(--primary);
+  border-radius: 8rpx;
+  font-size: 22rpx;
+  line-height: 1.5;
+}
+
+/* 复选框样式 */
+checkbox {
+  transform: scale(0.8);
+}

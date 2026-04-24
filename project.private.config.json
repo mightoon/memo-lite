@@ -1,0 +1,7 @@
+{
+  "description": "项目私有配置",
+  "projectname": "memo-lite",
+  "setting": {
+    "compileHotReLoad": true
+  }
+}

@@ -1,0 +1,143 @@
+<view class="container">
+  <!-- Tab 切换 -->
+  <view class="tab-bar">
+    <view class="tab-item {{currentTab === 'record' ? 'active' : ''}}" bindtap="switchTab" data-tab="record">
+      记录
+    </view>
+    <view class="tab-item {{currentTab === 'review' ? 'active' : ''}}" bindtap="switchTab" data-tab="review">
+      回顾
+    </view>
+  </view>
+
+  <!-- 记录面板 -->
+  <view class="card panel" wx:if="{{currentTab === 'record'}}">
+    <view class="p-3">
+      <textarea 
+        class="textarea" 
+        placeholder="在此记录你的想法..." 
+        value="{{noteContent}}"
+        bindinput="onNoteInput"
+        maxlength="1000"
+      />
+      
+      <!-- 语音输入提示 -->
+      <view class="voice-hint" wx:if="{{voiceHint}}">{{voiceHint}}</view>
+
+        <!-- 操作按钮 -->
+      <view class="record-controls mt-3">
+        <button class="btn btn-primary flex-1" bindtap="submitNote">记录</button>
+        
+        <!-- 语音按钮 -->
+        <view 
+          class="voice-btn {{isRecording ? 'recording' : ''}} {{inputMode === 'voice' ? 'voice-mode' : ''}}"
+          bindtap="toggleInputMode"
+          bindlongpress="startVoiceInput"
+          bindtouchend="stopVoiceInput"
+          bindtouchcancel="stopVoiceInput"
+        >
+          <text wx:if="{{inputMode === 'keyboard'}}" class="voice-icon-text">⌨️</text>
+          <text wx:elif="{{inputMode === 'voice' && !isRecording}}" class="voice-icon-text">🎤</text>
+          <text wx:if="{{isRecording}}" class="voice-icon-text">🔴</text>
+        </view>
+      </view>
+
+      <!-- 提示消息 -->
+      <view class="message {{messageType}}" wx:if="{{message}}">{{message}}</view>
+    </view>
+  </view>
+
+  <!-- 回顾面板 -->
+  <view class="card panel" wx:if="{{currentTab === 'review'}}">
+    <view class="p-3">
+      <!-- 时间筛选 -->
+      <view class="filter-section">
+        <view class="filter-label">时间范围</view>
+        <view class="filter-tags">
+          <view 
+            wx:for="{{timeFilters}}" 
+            wx:key="value"
+            class="tag {{currentTimeFilter === item.value ? 'tag-primary active' : 'tag-primary'}}"
+            bindtap="setTimeFilter"
+            data-value="{{item.value}}"
+          >
+            {{item.label}}
+          </view>
+        </view>
+      </view>
+
+      <!-- 状态筛选 -->
+      <view class="filter-section mt-3">
+        <view class="filter-label">状态筛选</view>
+        <view class="filter-tags">
+          <view 
+            wx:for="{{statusFilters}}" 
+            wx:key="*this"
+            class="tag {{currentStatusFilter === item ? 'tag-primary active' : 'tag-primary'}}"
+            bindtap="setStatusFilter"
+            data-value="{{item}}"
+          >
+            {{item}}
+          </view>
+        </view>
+      </view>
+
+      <!-- 批量操作栏 -->
+      <view class="batch-actions mt-3" wx:if="{{selectedNotes.length > 0}}">
+        <view class="flex-between">
+          <text class="text-sm">已选择 {{selectedNotes.length}} 条</text>
+          <view class="flex gap-2">
+            <button class="btn btn-success btn-sm" bindtap="batchSetProcessed">标记已处理</button>
+            <button class="btn btn-outline btn-sm" bindtap="batchSetPending">标记待处理</button>
+            <button class="btn btn-danger btn-sm" bindtap="batchDelete">删除</button>
+            <button class="btn btn-outline btn-sm" bindtap="cancelBatch">取消</button>
+          </view>
+        </view>
+      </view>
+
+      <!-- 笔记列表 -->
+      <view class="notes-list mt-3">
+        <view class="empty-state" wx:if="{{!hasTimeFilterSelected}}">
+          请选择时间范围查看笔记
+        </view>
+        <view class="empty-state" wx:elif="{{notes.length === 0}}">
+          没有找到符合条件的笔记
+        </view>
+        <view 
+          wx:for="{{notes}}" 
+          wx:key="id"
+          class="note-item {{item.status === '已处理' ? 'processed' : ''}}"
+        >
+          <!-- 选择框 -->
+          <checkbox 
+            checked="{{selectedNotes.includes(item.id)}}"
+            bindtap="toggleSelect"
+            data-id="{{item.id}}"
+          />
+          
+          <view class="flex-1">
+            <!-- 头部信息 -->
+            <view class="note-header flex-between">
+              <text class="text-sm text-muted">{{item.timestamp}}</text>
+              <view class="flex gap-2">
+                <text class="tag {{item.status === '已处理' ? 'tag-success' : 'tag-warning'}}">
+                  {{item.status}}
+                </text>
+                <button 
+                  class="action-link" 
+                  size="mini"
+                  bindtap="toggleNoteStatus"
+                  data-id="{{item.id}}"
+                  data-status="{{item.status === '已处理' ? '待处理' : '已处理'}}"
+                >
+                  {{item.status === '已处理' ? '标记待处理' : '标记已处理'}}
+                </button>
+              </view>
+            </view>
+            <!-- 内容 -->
+            <view class="note-content mt-2">{{item.content}}</view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>
