@@ -173,17 +173,24 @@ def login():
     if not WX_APPID or not WX_SECRET:
         # 开发模式：使用 code 作为 openid
         openid = f"dev_{code[:20]}"
+        users = read_users()
+        existing = users.get(openid)
         user = {
             "openid": openid,
-            "nickname": user_info.get('nickName', '用户'),
-            "avatar": user_info.get('avatarUrl', ''),
+            "nickname": user_info.get('nickName', existing.get('nickname', '用户') if existing else '用户'),
+            "avatar": user_info.get('avatarUrl', existing.get('avatar', '') if existing else ''),
             "login_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
+        if existing:
+            for key in ['role', 'user_type', 'created_at']:
+                if key in existing:
+                    user[key] = existing[key]
         write_user(user)
         return jsonify({
             "openid": openid,
             "nickname": user["nickname"],
-            "avatar": user["avatar"]
+            "avatar": user["avatar"],
+            "role": user.get('role')
         })
     
     # 生产模式：调用微信接口获取 openid
@@ -202,18 +209,25 @@ def login():
             return jsonify({"error": "微信登录失败", "detail": result}), 400
         
         openid = result['openid']
+        users = read_users()
+        existing = users.get(openid)
         user = {
             "openid": openid,
-            "nickname": user_info.get('nickName', '微信用户'),
-            "avatar": user_info.get('avatarUrl', ''),
+            "nickname": user_info.get('nickName', existing.get('nickname', '微信用户') if existing else '微信用户'),
+            "avatar": user_info.get('avatarUrl', existing.get('avatar', '') if existing else ''),
             "login_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
+        if existing:
+            for key in ['role', 'user_type', 'created_at']:
+                if key in existing:
+                    user[key] = existing[key]
         write_user(user)
         
         return jsonify({
             "openid": openid,
             "nickname": user["nickname"],
-            "avatar": user["avatar"]
+            "avatar": user["avatar"],
+            "role": user.get('role')
         })
     except Exception as e:
         return jsonify({"error": "登录失败", "detail": str(e)}), 500
