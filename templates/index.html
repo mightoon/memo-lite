@@ -3,12 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>快速笔记</title>
+    <title>思维便签</title>
     <link rel="stylesheet" href="static/style.css">
 </head>
 <body>
-    <div class="container">
-        <h1>快速笔记</h1>
+    <!-- ========== 登录/注册页面（默认显示）========== -->
+    <div id="auth-page" class="auth-page">
+        <div class="auth-brand">
+            <h1 class="auth-app-name">思维便签</h1>
+            <p class="auth-slogan">让思考留下痕迹</p>
+        </div>
+
+        <div class="auth-card">
+            <h2 id="auth-title">用户登录</h2>
+
+            <!-- 登录表单 -->
+            <div id="login-form">
+                <div class="form-group">
+                    <label>用户名</label>
+                    <input type="text" id="login-username" placeholder="请输入用户名" maxlength="20">
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" id="login-password" placeholder="请输入密码" minlength="6">
+                </div>
+                <button class="auth-submit-btn" onclick="handleLogin()">登录</button>
+                <p class="auth-switch">还没有账号？<a href="#" onclick="switchToRegister()">立即注册</a></p>
+            </div>
+
+            <!-- 注册表单 -->
+            <div id="register-form" style="display: none;">
+                <div class="form-group">
+                    <label>用户名</label>
+                    <input type="text" id="reg-username" placeholder="3-20位字母/数字/下划线" maxlength="20">
+                    <span class="input-hint">用户名注册后不可修改</span>
+                </div>
+                <div class="form-group">
+                    <label>昵称（可选）</label>
+                    <input type="text" id="reg-nickname" placeholder="显示名称，默认同用户名" maxlength="20">
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" id="reg-password" placeholder="至少6位密码" minlength="6">
+                </div>
+                <div class="form-group">
+                    <label>确认密码</label>
+                    <input type="password" id="reg-password2" placeholder="再次输入密码" minlength="6">
+                </div>
+                <button class="auth-submit-btn" onclick="handleRegister()">注册</button>
+                <p class="auth-switch">已有账号？<a href="#" onclick="switchToLogin()">直接登录</a></p>
+            </div>
+
+            <div id="auth-message" class="auth-message"></div>
+        </div>
+
+
+    </div>
+
+    <!-- ========== 笔记功能页面（登录后显示）========== -->
+    <div id="app-page" class="app-page" style="display: none;">
+        <div class="container">
+            <!-- 用户信息栏 -->
+            <div id="user-bar" class="user-bar">
+                <div class="user-info">
+                    <span id="user-avatar">👤</span>
+                    <span id="user-name">用户</span>
+                </div>
+                <button class="logout-btn" onclick="logout()">退出</button>
+            </div>
+
+            <h1>思维便签</h1>
         
         <div class="tab-buttons">
             <button id="btn-record" class="tab-btn active" onclick="showTab('record')">记录</button>
@@ -20,13 +84,44 @@
             <div class="input-group">
                 <textarea id="note-input" placeholder="在此记录你的想法..." rows="6"></textarea>
             </div>
-            <button class="action-btn" onclick="submitNote()">记录</button>
+            
+            <div class="record-controls">
+                <button class="action-btn" onclick="submitNote()">记录</button>
+                <button id="input-mode-btn" class="mode-toggle-btn" 
+                        onclick="handleModeButtonClick()"
+                        onmousedown="handleModeButtonPress()" 
+                        onmouseup="handleModeButtonRelease()"
+                        onmouseleave="handleModeButtonRelease()"
+                        ontouchstart="handleModeButtonPress()"
+                        ontouchend="handleModeButtonRelease()">
+                    <svg id="keyboard-icon" class="mode-icon-svg" viewBox="0 0 24 24" fill="currentColor">
+                        <!-- 2行3列键盘 - 小圆点 -->
+                        <rect x="5.5" y="5.5" width="2.5" height="2.5" rx="0.5"/>
+                        <rect x="10" y="5.5" width="2.5" height="2.5" rx="0.5"/>
+                        <rect x="14.5" y="5.5" width="2.5" height="2.5" rx="0.5"/>
+                        <rect x="5.5" y="10.5" width="2.5" height="2.5" rx="0.5"/>
+                        <rect x="10" y="10.5" width="2.5" height="2.5" rx="0.5"/>
+                        <rect x="14.5" y="10.5" width="2.5" height="2.5" rx="0.5"/>
+                        <!-- 底部空格键 - 改细 -->
+                        <rect x="5.5" y="16" width="12.5" height="2" rx="0.5"/>
+                    </svg>
+                    <svg id="voice-ready-icon" class="mode-icon-svg hidden" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                        <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                    </svg>
+                    <svg id="voice-recording-icon" class="mode-icon-svg hidden" viewBox="0 0 24 24" fill="currentColor">
+                        <circle cx="12" cy="12" r="3"/>
+                        <circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                        <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1"/>
+                    </svg>
+                </button>
+            </div>
+            <div id="voice-hint" class="voice-hint"></div>
             <div id="record-message" class="message"></div>
         </div>
         
         <!-- 回顾面板 -->
         <div id="review-panel" class="panel">
-            <!-- 时间筛选 -->
             <div class="filter-section">
                 <div class="filter-label">时间范围:</div>
                 <div class="quick-filters">
@@ -37,7 +132,6 @@
                 </div>
             </div>
             
-            <!-- 状态筛选 -->
             <div class="filter-section">
                 <div class="filter-label">状态筛选:</div>
                 <div class="status-filters">
@@ -47,7 +141,6 @@
                 </div>
             </div>
             
-            <!-- 批量操作 -->
             <div class="batch-actions" id="batch-actions" style="display: none;">
                 <span class="batch-info">已选择 <span id="selected-count">0</span> 条</span>
                 <button class="batch-btn" onclick="batchSetStatus('已处理')">标记为已处理</button>
@@ -61,60 +154,461 @@
             </div>
         </div>
     </div>
-    
+    </div>
+
     <script>
+        // ==================== 用户登录相关 ====================
+        let currentUser = null;
+
+        // 检查是否已登录，控制页面显示
+        function checkLogin() {
+            const openid = localStorage.getItem('openid');
+            const userInfo = localStorage.getItem('userInfo');
+
+            if (openid && userInfo) {
+                currentUser = JSON.parse(userInfo);
+                currentUser.openid = openid;
+                showAppPage();
+                return true;
+            } else {
+                showAuthPage();
+                return false;
+            }
+        }
+
+        // 显示登录页
+        function showAuthPage() {
+            document.getElementById('auth-page').style.display = 'flex';
+            document.getElementById('app-page').style.display = 'none';
+        }
+
+        // 显示应用页
+        function showAppPage() {
+            document.getElementById('auth-page').style.display = 'none';
+            document.getElementById('app-page').style.display = 'block';
+            document.getElementById('user-name').textContent = currentUser.nickname || currentUser.username || '用户';
+        }
+
+        // 切换到登录
+        function switchToLogin() {
+            document.getElementById('auth-title').textContent = '用户登录';
+            document.getElementById('login-form').style.display = 'block';
+            document.getElementById('register-form').style.display = 'none';
+            clearAuthMessage();
+        }
+
+        // 切换到注册
+        function switchToRegister() {
+            document.getElementById('auth-title').textContent = '用户注册';
+            document.getElementById('login-form').style.display = 'none';
+            document.getElementById('register-form').style.display = 'block';
+            clearAuthMessage();
+        }
+
+        // 显示认证消息
+        function showAuthMessage(text, type) {
+            const msgEl = document.getElementById('auth-message');
+            msgEl.textContent = text;
+            msgEl.className = 'auth-message ' + (type || '');
+        }
+
+        function clearAuthMessage() {
+            const msgEl = document.getElementById('auth-message');
+            msgEl.textContent = '';
+            msgEl.className = 'auth-message';
+        }
+
+        // 登录处理
+        async function handleLogin() {
+            const username = document.getElementById('login-username').value.trim();
+            const password = document.getElementById('login-password').value;
+
+            if (!username || !password) {
+                showAuthMessage('请输入用户名和密码', 'error');
+                return;
+            }
+
+            try {
+                const res = await fetch('api/web-login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+
+                if (res.ok) {
+                    // 保存登录信息
+                    localStorage.setItem('openid', data.openid);
+                    localStorage.setItem('userInfo', JSON.stringify(data));
+                    currentUser = data;
+                    currentUser.openid = data.openid;
+
+                    showAppPage();
+                } else {
+                    showAuthMessage(data.error || '登录失败', 'error');
+                }
+            } catch (err) {
+                showAuthMessage('网络错误，请重试', 'error');
+            }
+        }
+
+        // 注册处理
+        async function handleRegister() {
+            const username = document.getElementById('reg-username').value.trim();
+            const nickname = document.getElementById('reg-nickname').value.trim();
+            const password = document.getElementById('reg-password').value;
+            const password2 = document.getElementById('reg-password2').value;
+
+            // 前端校验
+            if (!username || !password) {
+                showAuthMessage('用户名和密码不能为空', 'error');
+                return;
+            }
+            if (username.length < 3 || username.length > 20) {
+                showAuthMessage('用户名长度需在3-20位之间', 'error');
+                return;
+            }
+            if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+                showAuthMessage('用户名只能包含字母、数字和下划线', 'error');
+                return;
+            }
+            if (password.length < 6) {
+                showAuthMessage('密码长度不能少于6位', 'error');
+                return;
+            }
+            if (password !== password2) {
+                showAuthMessage('两次输入的密码不一致', 'error');
+                return;
+            }
+
+            try {
+                const res = await fetch('api/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password, nickname })
+                });
+                const data = await res.json();
+
+                if (res.ok) {
+                    showAuthMessage('注册成功！请登录', 'success');
+                    // 清空表单
+                    document.getElementById('reg-username').value = '';
+                    document.getElementById('reg-nickname').value = '';
+                    document.getElementById('reg-password').value = '';
+                    document.getElementById('reg-password2').value = '';
+                    setTimeout(() => {
+                        switchToLogin();
+                    }, 1000);
+                } else {
+                    showAuthMessage(data.error || '注册失败', 'error');
+                }
+            } catch (err) {
+                showAuthMessage('网络错误，请重试', 'error');
+            }
+        }
+
+        // 退出登录
+        function logout() {
+            if (!confirm('确定要退出登录吗？')) return;
+
+            localStorage.removeItem('openid');
+            localStorage.removeItem('userInfo');
+            currentUser = null;
+            showAuthPage();
+        }
+
+        // ==================== 原有笔记功能 ====================
         let currentTimeFilter = null;
         let currentStatusFilter = '全部';
         let selectedNotes = new Set();
         let currentNotes = [];
         let hasTimeFilterSelected = false;
+        let currentInputMode = 'keyboard'; // 'keyboard' 或 'voice-ready'
+        let recognition = null;
+        let isRecording = false;
+        let finalTranscript = '';
+        let interimTranscript = '';
+        let pressTimer = null;
+        let isLongPress = false;
+        const LONG_PRESS_DURATION = 500;
+        let preRecordText = ''; // 录音前的原始文本
+        let refreshInterval = null; // 定时刷新输入框
+        let recordingStartTime = null; // 录音开始时间
+
+        // 页面加载时检查登录状态
+        window.addEventListener('DOMContentLoaded', checkLogin);
+
+        // 获取请求头（包含用户openid）
+        function getHeaders() {
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            const openid = localStorage.getItem('openid');
+            if (openid) {
+                headers['X-User-Openid'] = openid;
+            }
+            return headers;
+        }
+        const MAX_RECORDING_TIME = 30000; // 最大录音时间30秒
+
+        // 初始化语音识别
+        function initSpeechRecognition() {
+            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                recognition = new SpeechRecognition();
+                recognition.continuous = true;
+                recognition.interimResults = true;
+                recognition.lang = 'zh-CN';
+                
+                recognition.onstart = function() {
+                    // 录音已开始，状态已在 startRecording 中设置
+                    console.log('语音识别已开始');
+                };
+                
+                recognition.onresult = function(event) {
+                    let tempInterim = '';
+                    let newFinal = '';
+                    
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        const transcript = event.results[i][0].transcript;
+                        if (event.results[i].isFinal) {
+                            newFinal += transcript;
+                        } else {
+                            tempInterim += transcript;
+                        }
+                    }
+                    
+                    // 累加最终结果（不要覆盖，是累加）
+                    finalTranscript += newFinal;
+                    interimTranscript = tempInterim;
+                    
+                    // 立即更新输入框
+                    updateTextareaWithTranscript();
+                };
+                
+                recognition.onerror = function(event) {
+                    console.error('语音识别错误:', event.error);
+                    if (event.error === 'not-allowed') {
+                        alert('请允许使用麦克风权限');
+                    }
+                    stopRecording();
+                };
+                
+                recognition.onend = function() {
+                    if (!isRecording) {
+                        // 录音已停止，清除定时器
+                        clearInterval(refreshInterval);
+                        refreshInterval = null;
+                        // 最终更新
+                        updateTextareaWithTranscript();
+                        interimTranscript = '';
+                        showVoiceReadyState();
+                    } else {
+                        // 录音中意外结束，自动重启
+                        try {
+                            recognition.start();
+                        } catch (e) {
+                            console.error('重启语音识别失败:', e);
+                        }
+                    }
+                };
+                
+                return true;
+            } else {
+                alert('您的浏览器不支持语音识别功能，请使用 Chrome 或 Edge 浏览器');
+                return false;
+            }
+        }
+
+        // 更新输入框显示识别内容
+        function updateTextareaWithTranscript() {
+            const textarea = document.getElementById('note-input');
+            const hasContent = finalTranscript || interimTranscript;
+            const separator = preRecordText && hasContent ? ' ' : '';
+            const newValue = preRecordText + separator + finalTranscript + interimTranscript;
+            
+            textarea.value = newValue;
+            // 滚动到底部
+            textarea.scrollTop = textarea.scrollHeight;
+        }
+
+        // 处理模式按钮点击（短按切换）
+        function handleModeButtonClick() {
+            if (!isLongPress) {
+                if (currentInputMode === 'keyboard') {
+                    switchToVoiceMode();
+                } else {
+                    switchToKeyboardMode();
+                }
+            }
+        }
+
+        // 处理模式按钮按下
+        function handleModeButtonPress() {
+            isLongPress = false;
+            pressTimer = setTimeout(() => {
+                isLongPress = true;
+                if (currentInputMode === 'voice-ready' && !isRecording) {
+                    startRecording();
+                }
+            }, LONG_PRESS_DURATION);
+        }
+
+        // 处理模式按钮释放
+        function handleModeButtonRelease() {
+            clearTimeout(pressTimer);
+            if (isLongPress && isRecording) {
+                stopRecording();
+            }
+        }
+
+        // 切换到键盘模式
+        function switchToKeyboardMode() {
+            currentInputMode = 'keyboard';
+            document.getElementById('keyboard-icon').classList.remove('hidden');
+            document.getElementById('voice-ready-icon').classList.add('hidden');
+            document.getElementById('voice-recording-icon').classList.add('hidden');
+            document.getElementById('input-mode-btn').classList.remove('voice-mode');
+            document.getElementById('voice-hint').textContent = '';
+        }
+
+        // 切换到语音准备模式
+        function switchToVoiceMode() {
+            currentInputMode = 'voice-ready';
+            document.getElementById('keyboard-icon').classList.add('hidden');
+            document.getElementById('voice-ready-icon').classList.remove('hidden');
+            document.getElementById('voice-recording-icon').classList.add('hidden');
+            document.getElementById('input-mode-btn').classList.add('voice-mode');
+            document.getElementById('voice-hint').textContent = '长按开始语音输入';
+            
+            if (!recognition) {
+                initSpeechRecognition();
+            }
+        }
+
+        // 显示录音中状态
+        function showRecordingState() {
+            document.getElementById('keyboard-icon').classList.add('hidden');
+            document.getElementById('voice-ready-icon').classList.add('hidden');
+            document.getElementById('voice-recording-icon').classList.remove('hidden');
+            document.getElementById('input-mode-btn').classList.add('recording');
+            document.getElementById('voice-hint').textContent = '正在聆听，松开结束';
+        }
+
+        // 显示语音准备状态
+        function showVoiceReadyState() {
+            document.getElementById('keyboard-icon').classList.add('hidden');
+            document.getElementById('voice-ready-icon').classList.remove('hidden');
+            document.getElementById('voice-recording-icon').classList.add('hidden');
+            document.getElementById('input-mode-btn').classList.remove('recording');
+            document.getElementById('voice-hint').textContent = '长按开始语音输入';
+            finalTranscript = '';
+            interimTranscript = '';
+        }
+
+        // 开始录音
+        function startRecording() {
+            if (!recognition) {
+                if (!initSpeechRecognition()) return;
+            }
+            if (!isRecording) {
+                preRecordText = document.getElementById('note-input').value;
+                finalTranscript = '';
+                interimTranscript = '';
+                recordingStartTime = Date.now();
+                // 立即设置录音状态，确保按钮释放时能正确停止
+                isRecording = true;
+                showRecordingState();
+                
+                try {
+                    recognition.start();
+                    
+                    // 启动定时刷新，每100ms更新一次输入框
+                    refreshInterval = setInterval(() => {
+                        updateTextareaWithTranscript();
+                        
+                        // 检查是否超过30秒
+                        if (Date.now() - recordingStartTime >= MAX_RECORDING_TIME) {
+                            console.log('达到最大录音时间30秒，自动停止');
+                            stopRecording();
+                        }
+                    }, 100);
+                    
+                } catch (e) {
+                    console.error('启动语音识别失败:', e);
+                    // 如果已经在运行，先停止再启动
+                    try {
+                        recognition.stop();
+                        setTimeout(() => {
+                            recognition.start();
+                            refreshInterval = setInterval(() => {
+                                updateTextareaWithTranscript();
+                                if (Date.now() - recordingStartTime >= MAX_RECORDING_TIME) {
+                                    stopRecording();
+                                }
+                            }, 100);
+                        }, 200);
+                    } catch (err) {
+                        console.error('重启语音识别失败:', err);
+                        isRecording = false;
+                    }
+                }
+            }
+        }
+
+        // 停止录音
+        function stopRecording() {
+            isRecording = false;
+            
+            // 清除定时刷新
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+                refreshInterval = null;
+            }
+            
+            // 最后一次更新输入框
+            updateTextareaWithTranscript();
+            
+            if (recognition) {
+                try {
+                    recognition.stop();
+                } catch (e) {
+                    console.error('停止语音识别失败:', e);
+                }
+            }
+        }
 
         // 切换标签页
         function showTab(tab) {
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
             document.querySelectorAll('.panel').forEach(panel => panel.classList.remove('active'));
-            
             document.getElementById('btn-' + tab).classList.add('active');
             document.getElementById(tab + '-panel').classList.add('active');
             
-            // 切换到记录标签时，清空回顾结果和筛选选项
             if (tab === 'record') {
                 document.getElementById('notes-list').innerHTML = '<p class="empty-tip">请选择时间范围查看想法</p>';
                 selectedNotes.clear();
                 updateBatchActions();
             }
             
-            // 切换到回顾标签时，清空筛选选项
             if (tab === 'review') {
-                // 重置筛选变量
                 currentTimeFilter = null;
                 currentStatusFilter = '全部';
                 hasTimeFilterSelected = false;
                 selectedNotes.clear();
                 updateBatchActions();
-                
-                // 重置时间筛选按钮状态
-                document.querySelectorAll('.quick-filters .quick-btn').forEach(btn => {
-                    btn.classList.remove('active');
-                });
-                
-                // 重置状态筛选按钮状态（默认选中"全部"）
+                document.querySelectorAll('.quick-filters .quick-btn').forEach(btn => btn.classList.remove('active'));
                 document.querySelectorAll('.status-filters .status-btn').forEach(btn => {
                     btn.classList.remove('active');
-                    if (btn.textContent === '全部') {
-                        btn.classList.add('active');
-                    }
+                    if (btn.textContent === '全部') btn.classList.add('active');
                 });
-                
-                // 清空查询结果列表
                 document.getElementById('notes-list').innerHTML = '<p class="empty-tip">请选择时间范围查看想法</p>';
             }
         }
         
         // 提交笔记
         async function submitNote() {
-            const input = document.getElementById('note-input');
-            const content = input.value.trim();
+            const content = document.getElementById('note-input').value.trim();
             const messageDiv = document.getElementById('record-message');
             
             if (!content) {
@@ -125,13 +619,15 @@
             try {
                 const response = await fetch('api/notes', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: getHeaders(),
                     body: JSON.stringify({ content })
                 });
                 
                 if (response.ok) {
                     showMessage(messageDiv, '记录成功！', 'success');
-                    input.value = '';
+                    document.getElementById('note-input').value = '';
+                    finalTranscript = '';
+                    interimTranscript = '';
                 } else {
                     showMessage(messageDiv, '记录失败，请重试', 'error');
                 }
@@ -144,22 +640,16 @@
         function setTimeFilter(type) {
             currentTimeFilter = type;
             hasTimeFilterSelected = true;
-            document.querySelectorAll('.quick-filters .quick-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
+            document.querySelectorAll('.quick-filters .quick-btn').forEach(btn => btn.classList.remove('active'));
             event.target.classList.add('active');
-            // 自动查询
             queryNotes();
         }
         
         // 设置状态筛选
         function setStatusFilter(status) {
             currentStatusFilter = status;
-            document.querySelectorAll('.status-filters .status-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
+            document.querySelectorAll('.status-filters .status-btn').forEach(btn => btn.classList.remove('active'));
             event.target.classList.add('active');
-            // 如果已经选择了时间筛选，则自动查询
             if (hasTimeFilterSelected) {
                 queryNotes();
             }
@@ -202,7 +692,9 @@
             if (params.length > 0) url += '?' + params.join('&');
             
             try {
-                const response = await fetch(url);
+                const response = await fetch(url, {
+                    headers: getHeaders()
+                });
                 const data = await response.json();
                 currentNotes = data.notes;
                 selectedNotes.clear();
@@ -251,20 +743,14 @@
         function updateBatchActions() {
             const batchActions = document.getElementById('batch-actions');
             const selectedCount = document.getElementById('selected-count');
-            
             selectedCount.textContent = selectedNotes.size;
-            
-            if (selectedNotes.size > 0) {
-                batchActions.style.display = 'flex';
-            } else {
-                batchActions.style.display = 'none';
-            }
+            batchActions.style.display = selectedNotes.size > 0 ? 'flex' : 'none';
         }
         
         // 取消批量选择
         function cancelBatch() {
             selectedNotes.clear();
-            queryNotes(); // 刷新列表
+            queryNotes();
         }
         
         // 切换单条笔记状态
@@ -272,12 +758,11 @@
             try {
                 const response = await fetch(`api/notes/${noteId}/status`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: getHeaders(),
                     body: JSON.stringify({ status: newStatus })
                 });
-                
                 if (response.ok) {
-                    queryNotes(); // 刷新列表
+                    queryNotes();
                 } else {
                     alert('更新失败，请重试');
                 }
@@ -289,20 +774,15 @@
         // 批量设置状态
         async function batchSetStatus(newStatus) {
             if (selectedNotes.size === 0) return;
-            
             try {
                 const response = await fetch('api/notes/batch/status', {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        ids: Array.from(selectedNotes),
-                        status: newStatus 
-                    })
+                    headers: getHeaders(),
+                    body: JSON.stringify({ ids: Array.from(selectedNotes), status: newStatus })
                 });
-                
                 if (response.ok) {
                     selectedNotes.clear();
-                    queryNotes(); // 刷新列表
+                    queryNotes();
                 } else {
                     alert('批量更新失败，请重试');
                 }
@@ -314,23 +794,17 @@
         // 批量删除
         async function batchDelete() {
             if (selectedNotes.size === 0) return;
-            
-            if (!confirm(`确定要删除选中的 ${selectedNotes.size} 条想法吗？`)) {
-                return;
-            }
+            if (!confirm(`确定要删除选中的 ${selectedNotes.size} 条想法吗？`)) return;
             
             try {
                 const response = await fetch('api/notes/batch', {
                     method: 'DELETE',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        ids: Array.from(selectedNotes)
-                    })
+                    headers: getHeaders(),
+                    body: JSON.stringify({ ids: Array.from(selectedNotes) })
                 });
-                
                 if (response.ok) {
                     selectedNotes.clear();
-                    queryNotes(); // 刷新列表
+                    queryNotes();
                 } else {
                     alert('删除失败，请重试');
                 }

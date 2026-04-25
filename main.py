@@ -2,8 +2,26 @@ from flask import Flask, render_template, request, jsonify
 from datetime import datetime
 import os
 import json
+import requests
+import re
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app, resources={
+    r"/api/*": {
+        "origins": ["*"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }
+})
+
+# 微信小程序配置（需要在环境变量中设置）
+WX_APPID = os.environ.get('WX_APPID', '')
+WX_SECRET = os.environ.get('WX_SECRET', '')
+
+# 存储临时登录状态（生产环境应使用 Redis）
+login_states = {}
 
 class PrefixMiddleware:
     def __init__(self, app, prefix=''):
@@ -20,6 +38,79 @@ class PrefixMiddleware:
 app.wsgi_app = PrefixMiddleware(app.wsgi_app)
 
 NOTES_FILE = "notes.txt"
+USERS_FILE = "users.txt"
+
+# 确保文件存在
+def ensure_file(filename):
+    if not os.path.exists(filename):
+        with open(filename, "w", encoding="utf-8") as f:
+            pass
+
+def read_users():
+    ensure_file(USERS_FILE)
+    users = {}
+    with open(USERS_FILE, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                try:
+                    user = json.loads(line)
+                    users[user.get('openid')] = user
+                except:
+                    pass
+    return users
+
+def write_user(user):
+    users = read_users()
+    users[user['openid']] = user
+    with open(USERS_FILE, "w", encoding="utf-8") as f:
+        for u in users.values():
+            f.write(json.dumps(u, ensure_ascii=False) + "\n")
+
+def find_user_by_username(username):
+    """通过用户名查找用户"""
+    users = read_users()
+    for user in users.values():
+        if user.get('username') == username:
+            return user
+    return None
+
+def ensure_admin_user():
+    """确保存在 admin 用户，默认密码 admin123"""
+    users = read_users()
+    for u in users.values():
+        if u.get('role') == 'admin':
+            return
+    admin_user = {
+        "openid": "web_admin",
+        "username": "admin",
+        "password_hash": generate_password_hash("admin123"),
+        "nickname": "管理员",
+        "avatar": "",
+        "user_type": "web",
+        "role": "admin",
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+    write_user(admin_user)
+
+def get_current_user():
+    """从请求头获取当前用户"""
+    openid = request.headers.get('X-User-Openid')
+    if openid:
+        users = read_users()
+        return users.get(openid)
+    return None
+
+def get_user_identifier():
+    """
+    获取用户标识，兼容小程序和浏览器访问：
+    - 小程序/Web登录用户：从请求头获取 openid
+    - 未登录浏览器：返回 None（需要登录才能使用）
+    """
+    openid = request.headers.get('X-User-Openid')
+    if openid:
+        return openid
+    return None
 
 # 确保笔记文件存在
 def ensure_notes_file():
@@ -27,8 +118,8 @@ def ensure_notes_file():
         with open(NOTES_FILE, "w", encoding="utf-8") as f:
             pass
 
-# 读取所有笔记
-def read_notes():
+# 读取所有笔记（支持按用户筛选）
+def read_notes(user_openid=None):
     ensure_notes_file()
     notes = []
     with open(NOTES_FILE, "r", encoding="utf-8") as f:
@@ -38,6 +129,9 @@ def read_notes():
                 continue
             try:
                 note = json.loads(line)
+                # 如果指定了用户，只返回该用户的笔记
+                if user_openid and note.get('user_openid') != user_openid:
+                    continue
                 notes.append(note)
             except json.JSONDecodeError:
                 # 兼容旧格式: [timestamp] content
@@ -49,7 +143,8 @@ def read_notes():
                         "id": timestamp_str.replace(" ", "_").replace(":", "-"),
                         "timestamp": timestamp_str,
                         "content": content,
-                        "status": "待处理"
+                        "status": "待处理",
+                        "user_openid": None
                     })
     return notes
 
@@ -63,10 +158,160 @@ def write_notes(notes):
 def index():
     return render_template("index.html")
 
+# ==================== 用户登录接口 ====================
+@app.route("/api/login", methods=["POST"])
+def login():
+    """微信小程序登录"""
+    data = request.get_json()
+    code = data.get('code')
+    user_info = data.get('userInfo', {})
+    
+    if not code:
+        return jsonify({"error": "缺少code参数"}), 400
+    
+    # 如果没有配置 appid/secret，使用模拟登录（开发测试用）
+    if not WX_APPID or not WX_SECRET:
+        # 开发模式：使用 code 作为 openid
+        openid = f"dev_{code[:20]}"
+        user = {
+            "openid": openid,
+            "nickname": user_info.get('nickName', '用户'),
+            "avatar": user_info.get('avatarUrl', ''),
+            "login_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        write_user(user)
+        return jsonify({
+            "openid": openid,
+            "nickname": user["nickname"],
+            "avatar": user["avatar"]
+        })
+    
+    # 生产模式：调用微信接口获取 openid
+    try:
+        url = f"https://api.weixin.qq.com/sns/jscode2session"
+        params = {
+            "appid": WX_APPID,
+            "secret": WX_SECRET,
+            "js_code": code,
+            "grant_type": "authorization_code"
+        }
+        resp = requests.get(url, params=params, timeout=10)
+        result = resp.json()
+        
+        if 'openid' not in result:
+            return jsonify({"error": "微信登录失败", "detail": result}), 400
+        
+        openid = result['openid']
+        user = {
+            "openid": openid,
+            "nickname": user_info.get('nickName', '微信用户'),
+            "avatar": user_info.get('avatarUrl', ''),
+            "login_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        write_user(user)
+        
+        return jsonify({
+            "openid": openid,
+            "nickname": user["nickname"],
+            "avatar": user["avatar"]
+        })
+    except Exception as e:
+        return jsonify({"error": "登录失败", "detail": str(e)}), 500
+
+
+# ==================== 网页版用户名/密码登录 ====================
+@app.route("/api/register", methods=["POST"])
+def register():
+    """用户注册"""
+    data = request.get_json()
+    username = data.get('username', '').strip()
+    password = data.get('password', '')
+    nickname = data.get('nickname', '').strip()
+    
+    # 验证参数
+    if not username or not password:
+        return jsonify({"error": "用户名和密码不能为空"}), 400
+    
+    # 用户名长度限制
+    if len(username) < 3 or len(username) > 20:
+        return jsonify({"error": "用户名长度需在3-20个字符之间"}), 400
+    
+    # 密码长度限制
+    if len(password) < 6:
+        return jsonify({"error": "密码长度不能少于6位"}), 400
+    
+    # 用户名格式：只允许字母、数字、下划线
+    if not re.match(r'^[a-zA-Z0-9_]+$', username):
+        return jsonify({"error": "用户名只能包含字母、数字和下划线"}), 400
+    
+    # 检查用户名是否已存在
+    existing_user = find_user_by_username(username)
+    if existing_user:
+        return jsonify({"error": "用户名已被注册"}), 409
+    
+    # 创建用户
+    openid = f"web_{username}"
+    user = {
+        "openid": openid,
+        "username": username,
+        "password_hash": generate_password_hash(password),
+        "nickname": nickname or username,
+        "avatar": "",
+        "user_type": "web",
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+    write_user(user)
+    
+    return jsonify({
+        "message": "注册成功",
+        "openid": openid,
+        "nickname": user["nickname"]
+    }), 201
+
+
+@app.route("/api/web-login", methods=["POST"])
+def web_login():
+    """网页版用户名密码登录"""
+    data = request.get_json()
+    username = data.get('username', '').strip()
+    password = data.get('password', '')
+    
+    if not username or not password:
+        return jsonify({"error": "用户名和密码不能为空"}), 400
+    
+    # 查找用户
+    user = find_user_by_username(username)
+    if not user:
+        return jsonify({"error": "用户名或密码错误"}), 401
+    
+    # 检查是否是Web用户
+    if user.get('user_type') != 'web':
+        return jsonify({"error": "该账号为微信登录账号，请使用微信登录"}), 401
+    
+    # 验证密码
+    if not check_password_hash(user['password_hash'], password):
+        return jsonify({"error": "用户名或密码错误"}), 401
+    
+    # 更新登录时间
+    user['login_time'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    write_user(user)
+    
+    return jsonify({
+        "message": "登录成功",
+        "openid": user['openid'],
+        "nickname": user['nickname'],
+        "username": user['username'],
+        "role": user.get('role', 'user')
+    })
+
 @app.route("/api/notes", methods=["POST"])
 def add_note():
     data = request.get_json()
     content = data.get("content", "").strip()
+    user_id = get_user_identifier()  # 兼容小程序和浏览器
+    
+    if not user_id:
+        return jsonify({"error": "请先登录"}), 401
     
     if not content:
         return jsonify({"error": "内容不能为空"}), 400
@@ -78,7 +323,8 @@ def add_note():
         "id": note_id,
         "timestamp": timestamp,
         "content": content,
-        "status": "待处理"
+        "status": "待处理",
+        "user_openid": user_id  # 绑定用户标识
     }
     
     with open(NOTES_FILE, "a", encoding="utf-8") as f:
@@ -91,8 +337,14 @@ def get_notes():
     start_date = request.args.get("start_date")
     end_date = request.args.get("end_date")
     status_filter = request.args.get("status")  # 待处理, 已处理, 全部
+    user_id = get_user_identifier()  # 兼容小程序和浏览器
     
-    notes = read_notes()
+    if not user_id:
+        return jsonify({"error": "请先登录", "notes": []}), 401
+    
+    user = get_current_user()
+    is_admin = user and user.get('role') == 'admin'
+    notes = read_notes(user_openid=None if is_admin else user_id)
     filtered_notes = []
     
     for note in notes:
@@ -124,11 +376,18 @@ def get_notes():
 def update_note_status(note_id):
     data = request.get_json()
     new_status = data.get("status")
+    user_id = get_user_identifier()  # 兼容小程序和浏览器
+    
+    if not user_id:
+        return jsonify({"error": "请先登录"}), 401
     
     if new_status not in ["待处理", "已处理"]:
         return jsonify({"error": "状态必须是'待处理'或'已处理'"}), 400
     
-    notes = read_notes()
+    user = get_current_user()
+    is_admin = user and user.get('role') == 'admin'
+    
+    notes = read_notes(user_openid=None if is_admin else user_id)
     found = False
     
     for note in notes:
@@ -140,7 +399,13 @@ def update_note_status(note_id):
     if not found:
         return jsonify({"error": "笔记不存在"}), 404
     
-    write_notes(notes)
+    # 需要保留其他用户的笔记，所以读取全部再写入
+    all_notes = read_notes()
+    for note in all_notes:
+        if note["id"] == note_id and (is_admin or note.get('user_openid') == user_id):
+            note["status"] = new_status
+            break
+    write_notes(all_notes)
     return jsonify({"message": "状态更新成功"})
 
 @app.route("/api/notes/batch/status", methods=["PUT"])
@@ -148,6 +413,10 @@ def batch_update_status():
     data = request.get_json()
     note_ids = data.get("ids", [])
     new_status = data.get("status")
+    user_id = get_user_identifier()  # 兼容小程序和浏览器
+    
+    if not user_id:
+        return jsonify({"error": "请先登录"}), 401
     
     if not note_ids:
         return jsonify({"error": "请选择要更新的笔记"}), 400
@@ -155,35 +424,46 @@ def batch_update_status():
     if new_status not in ["待处理", "已处理"]:
         return jsonify({"error": "状态必须是'待处理'或'已处理'"}), 400
     
-    notes = read_notes()
+    user = get_current_user()
+    is_admin = user and user.get('role') == 'admin'
+    
+    all_notes = read_notes()
     updated_count = 0
     
-    for note in notes:
-        if note["id"] in note_ids:
+    for note in all_notes:
+        if note["id"] in note_ids and (is_admin or note.get('user_openid') == user_id):
             note["status"] = new_status
             updated_count += 1
     
-    write_notes(notes)
+    write_notes(all_notes)
     return jsonify({"message": f"成功更新 {updated_count} 条笔记", "updated": updated_count})
 
 @app.route("/api/notes/batch", methods=["DELETE"])
 def batch_delete_notes():
     data = request.get_json()
     note_ids = data.get("ids", [])
+    user_id = get_user_identifier()  # 兼容小程序和浏览器
+    
+    if not user_id:
+        return jsonify({"error": "请先登录"}), 401
     
     if not note_ids:
         return jsonify({"error": "请选择要删除的笔记"}), 400
     
-    notes = read_notes()
-    original_count = len(notes)
+    user = get_current_user()
+    is_admin = user and user.get('role') == 'admin'
     
-    # 过滤掉要删除的笔记
-    notes = [note for note in notes if note["id"] not in note_ids]
+    all_notes = read_notes()
+    original_count = len(all_notes)
+    
+    notes = [note for note in all_notes if not (note["id"] in note_ids and (is_admin or note.get('user_openid') == user_id))]
     
     deleted_count = original_count - len(notes)
     
     write_notes(notes)
     return jsonify({"message": f"成功删除 {deleted_count} 条笔记", "deleted": deleted_count})
+
+ensure_admin_user()
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
