@@ -29,12 +29,58 @@ Page({
     currentStatusFilter: '全部',
     hasTimeFilterSelected: false,
     notes: [],
-    selectedNotes: []
+    selectedNotes: [],
+
+    // 用户信息
+    userInfo: null
   },
 
   onLoad() {
+    // 检查登录态
+    this.checkLogin()
     // 初始化录音管理器
     this.initRecorder()
+  },
+
+  onShow() {
+    // 每次显示页面时检查登录态
+    this.checkLogin()
+  },
+
+  // 检查登录状态
+  checkLogin() {
+    const openid = wx.getStorageSync('openid')
+    const userInfo = wx.getStorageSync('userInfo')
+    
+    if (!openid) {
+      // 未登录，跳转到登录页
+      wx.redirectTo({
+        url: '/pages/login/login'
+      })
+      return false
+    }
+    
+    this.setData({ userInfo })
+    return true
+  },
+
+  // 退出登录
+  logout() {
+    wx.showModal({
+      title: '确认退出',
+      content: '退出后将需要重新登录',
+      success: (res) => {
+        if (res.confirm) {
+          // 清除登录态
+          wx.removeStorageSync('openid')
+          wx.removeStorageSync('userInfo')
+          // 跳转到登录页
+          wx.redirectTo({
+            url: '/pages/login/login'
+          })
+        }
+      }
+    })
   },
 
   // ==================== Tab 切换 ====================

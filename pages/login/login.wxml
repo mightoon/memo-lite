@@ -1,0 +1,23 @@
+<view class="login-container">
+  <view class="login-card">
+    <view class="title">思维便签</view>
+    <view class="subtitle">让思考留下痕迹</view>
+    
+    <view class="login-form">
+      <button 
+        class="login-btn" 
+        type="primary" 
+        bindtap="handleLogin"
+      >
+        <text>微信一键登录</text>
+      </button>
+      
+      <view class="privacy-notice">
+        登录即表示您同意
+        <text class="link" bindtap="showPrivacy">《隐私协议》</text>
+        和
+        <text class="link" bindtap="showTerms">《用户协议》</text>
+      </view>
+    </view>
+  </view>
+</view>

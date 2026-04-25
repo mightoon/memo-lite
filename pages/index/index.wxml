@@ -1,4 +1,14 @@
 <view class="container">
+  <!-- 用户信息栏 -->
+  <view class="user-bar" wx:if="{{userInfo}}">
+    <view class="user-info">
+      <text class="user-name">{{userInfo.nickname}}</text>
+    </view>
+    <view class="logout-btn" bindtap="logout">
+      <text>退出</text>
+    </view>
+  </view>
+
   <!-- Tab 切换 -->
   <view class="tab-bar">
     <view class="tab-item {{currentTab === 'record' ? 'active' : ''}}" bindtap="switchTab" data-tab="record">

@@ -1,16 +1,28 @@
-const app = getApp()
-const API_BASE = app.globalData.apiBaseUrl
+const API_BASE = 'https://mightoon.site/memo-lite/api'
+
+// 获取当前用户的 openid
+function getOpenid() {
+  return wx.getStorageSync('openid')
+}
 
 // 封装请求
 function request(options) {
   return new Promise((resolve, reject) => {
+    const openid = getOpenid()
+    const headers = {
+      'Content-Type': 'application/json'
+    }
+    // 如果有 openid，添加到请求头
+    if (openid) {
+      headers['X-User-Openid'] = openid
+    }
+
     wx.request({
       url: API_BASE + options.url,
       method: options.method || 'GET',
       data: options.data || {},
-      header: {
-        'Content-Type': 'application/json'
-      },
+      header: headers,
+      timeout: 10000,
       success: (res) => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(res.data)
@@ -19,13 +31,22 @@ function request(options) {
         }
       },
       fail: (err) => {
-        reject(new Error('网络错误'))
+        reject(new Error(err.errMsg || '网络错误'))
       }
     })
   })
 }
 
 module.exports = {
+  // 用户登录
+  login: (code, userInfo) => {
+    return request({
+      url: '/login',
+      method: 'POST',
+      data: { code, userInfo }
+    })
+  },
+
   // 添加笔记
   addNote: (content) => {
     return request({
