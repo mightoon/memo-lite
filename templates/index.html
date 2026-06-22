@@ -21,11 +21,11 @@
             <div id="login-form">
                 <div class="form-group">
                     <label>用户名</label>
-                    <input type="text" id="login-username" placeholder="请输入用户名" maxlength="20">
+                    <input type="text" id="login-username" placeholder="请输入用户名" maxlength="20" onkeydown="if(event.key==='Enter') document.getElementById('login-password').focus()">
                 </div>
                 <div class="form-group">
                     <label>密码</label>
-                    <input type="password" id="login-password" placeholder="请输入密码" minlength="6">
+                    <input type="password" id="login-password" placeholder="请输入密码" minlength="6" onkeydown="if(event.key==='Enter') handleLogin()">
                 </div>
                 <button class="auth-submit-btn" onclick="handleLogin()">登录</button>
                 <p class="auth-switch">还没有账号？<a href="#" onclick="switchToRegister()">立即注册</a></p>
@@ -35,20 +35,20 @@
             <div id="register-form" style="display: none;">
                 <div class="form-group">
                     <label>用户名</label>
-                    <input type="text" id="reg-username" placeholder="3-20位字母/数字/下划线" maxlength="20">
+                    <input type="text" id="reg-username" placeholder="3-20位字母/数字/下划线" maxlength="20" onkeydown="if(event.key==='Enter') document.getElementById('reg-nickname').focus()">
                     <span class="input-hint">用户名注册后不可修改</span>
                 </div>
                 <div class="form-group">
                     <label>昵称（可选）</label>
-                    <input type="text" id="reg-nickname" placeholder="显示名称，默认同用户名" maxlength="20">
+                    <input type="text" id="reg-nickname" placeholder="显示名称，默认同用户名" maxlength="20" onkeydown="if(event.key==='Enter') document.getElementById('reg-password').focus()">
                 </div>
                 <div class="form-group">
                     <label>密码</label>
-                    <input type="password" id="reg-password" placeholder="至少6位密码" minlength="6">
+                    <input type="password" id="reg-password" placeholder="至少6位密码" minlength="6" onkeydown="if(event.key==='Enter') document.getElementById('reg-password2').focus()">
                 </div>
                 <div class="form-group">
                     <label>确认密码</label>
-                    <input type="password" id="reg-password2" placeholder="再次输入密码" minlength="6">
+                    <input type="password" id="reg-password2" placeholder="再次输入密码" minlength="6" onkeydown="if(event.key==='Enter') handleRegister()">
                 </div>
                 <button class="auth-submit-btn" onclick="handleRegister()">注册</button>
                 <p class="auth-switch">已有账号？<a href="#" onclick="switchToLogin()">直接登录</a></p>
@@ -65,11 +65,19 @@
         <div class="container">
             <!-- 用户信息栏 -->
             <div id="user-bar" class="user-bar">
-                <div class="user-info">
-                    <span id="user-avatar">👤</span>
-                    <span id="user-name">用户</span>
+                <input type="file" id="import-file" accept=".md" style="display:none" onchange="handleImport(event)">
+                <div class="user-menu-wrapper">
+                    <span id="user-avatar" class="user-avatar-trigger" onclick="toggleUserMenu(event)">👤</span>
+                    <div id="user-menu" class="user-menu">
+                        <div class="user-menu-header">
+                            <span id="user-name">用户</span>
+                        </div>
+                        <div class="user-menu-item" onclick="closeUserMenu(); openExportModal()">导出</div>
+                        <div class="user-menu-item" onclick="closeUserMenu(); document.getElementById('import-file').click()">导入</div>
+                        <div class="user-menu-item" onclick="closeUserMenu(); openTagManageModal()">标签管理</div>
+                        <div class="user-menu-item logout" onclick="closeUserMenu(); logout()">退出</div>
+                    </div>
                 </div>
-                <button class="logout-btn" onclick="logout()">退出</button>
             </div>
 
             <h1>思维便签</h1>
@@ -83,6 +91,26 @@
         <div id="record-panel" class="panel active">
             <div class="input-group">
                 <textarea id="note-input" placeholder="在此记录你的想法..." rows="6"></textarea>
+            </div>
+            
+            <!-- 标签选择区域 -->
+            <div class="tag-section">
+                <div class="tag-input-row">
+                    <div class="tag-input-wrapper">
+                        <input type="text" id="tag-input" class="tag-input" placeholder="添加标签" oninput="onTagInputChange()" onkeydown="handleTagInputKeydown(event)">
+                        <span id="tag-add-btn" class="tag-add-btn" onclick="addTagFromInput()">添加</span>
+                    </div>
+                    <div class="tag-dropdown-wrapper">
+                        <button class="tag-dropdown-btn" onclick="toggleTagDropdown(event)">
+                            <span>选择标签</span>
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
+                        </button>
+                        <div id="tag-dropdown" class="tag-dropdown-content">
+                            <p class="tag-dropdown-empty">暂无标签</p>
+                        </div>
+                    </div>
+                </div>
+                <div id="selected-tags" class="selected-tags"></div>
             </div>
             
             <div class="record-controls">
@@ -141,10 +169,23 @@
                 </div>
             </div>
             
+            <div class="filter-section">
+                <div class="filter-label">标签筛选:</div>
+                <div class="tag-filters" id="tag-filters">
+                    <button class="tag-btn active" onclick="setTagFilter('全部')">全部</button>
+                </div>
+            </div>
+            
             <div class="batch-actions" id="batch-actions" style="display: none;">
                 <span class="batch-info">已选择 <span id="selected-count">0</span> 条</span>
                 <button class="batch-btn" onclick="batchSetStatus('已处理')">标记为已处理</button>
                 <button class="batch-btn" onclick="batchSetStatus('待处理')">标记为待处理</button>
+                <div class="batch-tag-dropdown-wrapper">
+                    <button class="batch-btn" onclick="toggleBatchTagDropdown(event)">添加标签 ▾</button>
+                    <div id="batch-tag-dropdown" class="batch-tag-dropdown">
+                        <p class="batch-tag-empty">暂无标签</p>
+                    </div>
+                </div>
                 <button class="batch-btn delete" onclick="batchDelete()">删除</button>
                 <button class="batch-btn cancel" onclick="cancelBatch()">取消选择</button>
             </div>
@@ -154,6 +195,56 @@
             </div>
         </div>
     </div>
+    </div>
+
+    <!-- ========== 导出弹窗 ========== -->
+    <div id="export-modal" class="modal-overlay" style="display:none">
+        <div class="modal-card">
+            <h3>导出笔记</h3>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>时间范围</label>
+                    <div class="export-time-filters">
+                        <button class="export-time-btn active" data-range="all" onclick="setExportTimeRange('all', this)">全部</button>
+                        <button class="export-time-btn" data-range="today" onclick="setExportTimeRange('today', this)">当前</button>
+                        <button class="export-time-btn" data-range="3days" onclick="setExportTimeRange('3days', this)">近3天</button>
+                        <button class="export-time-btn" data-range="week" onclick="setExportTimeRange('week', this)">近一周</button>
+                        <span class="export-custom-label">自定义</span>
+                        <input type="number" id="export-custom-days" class="export-custom-input" placeholder="天数" min="1" max="3650" oninput="setExportTimeRange('custom', null)">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>标签选择</label>
+                    <div id="export-tags-list" class="export-tags-list">
+                        <label class="export-tag-item"><input type="checkbox" value="all" checked onchange="onExportTagAllChange()"> 全部</label>
+                    </div>
+                </div>
+                <div id="export-preview" class="export-preview">将导出 0 条记录</div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn cancel" onclick="closeExportModal()">取消</button>
+                <button class="modal-btn confirm" onclick="doExport()">导出</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== 标签管理弹窗 ========== -->
+    <div id="tag-manage-modal" class="modal-overlay" style="display:none">
+        <div class="modal-card tag-manage-card">
+            <h3>标签管理</h3>
+            <div class="modal-body">
+                <div class="tag-manage-add-row">
+                    <input type="text" id="tag-manage-new-input" class="tag-manage-input" placeholder="输入新标签名称" onkeydown="if(event.key==='Enter') tagManageAdd()">
+                    <button class="modal-btn confirm" onclick="tagManageAdd()">新增</button>
+                </div>
+                <div id="tag-manage-list" class="tag-manage-list">
+                    <p class="empty-tip">暂无标签</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn cancel" onclick="closeTagManageModal()">关闭</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -187,6 +278,7 @@
             document.getElementById('auth-page').style.display = 'none';
             document.getElementById('app-page').style.display = 'block';
             document.getElementById('user-name').textContent = currentUser.nickname || currentUser.username || '用户';
+            loadExistingTags();
         }
 
         // 切换到登录
@@ -317,12 +409,35 @@
             showAuthPage();
         }
 
+        // ==================== 用户下拉菜单 ====================
+        function toggleUserMenu(e) {
+            e.stopPropagation();
+            document.getElementById('user-menu').classList.toggle('show');
+        }
+
+        function closeUserMenu() {
+            document.getElementById('user-menu').classList.remove('show');
+        }
+
+        // 点击页面其他地方关闭用户菜单
+        document.addEventListener('click', function(e) {
+            const menu = document.getElementById('user-menu');
+            if (menu && menu.classList.contains('show')) {
+                if (!e.target.closest('.user-menu-wrapper')) {
+                    menu.classList.remove('show');
+                }
+            }
+        });
+
         // ==================== 原有笔记功能 ====================
         let currentTimeFilter = null;
         let currentStatusFilter = '全部';
+        let currentTagFilter = '全部';
         let selectedNotes = new Set();
         let currentNotes = [];
         let hasTimeFilterSelected = false;
+        let selectedTags = new Set();  // 记录页已选标签
+        let existingTags = [];         // 当前用户已有标签列表
         let currentInputMode = 'keyboard'; // 'keyboard' 或 'voice-ready'
         let recognition = null;
         let isRecording = false;
@@ -589,11 +704,13 @@
                 document.getElementById('notes-list').innerHTML = '<p class="empty-tip">请选择时间范围查看想法</p>';
                 selectedNotes.clear();
                 updateBatchActions();
+                loadExistingTags();
             }
             
             if (tab === 'review') {
                 currentTimeFilter = null;
                 currentStatusFilter = '全部';
+                currentTagFilter = '全部';
                 hasTimeFilterSelected = false;
                 selectedNotes.clear();
                 updateBatchActions();
@@ -602,6 +719,7 @@
                     btn.classList.remove('active');
                     if (btn.textContent === '全部') btn.classList.add('active');
                 });
+                loadReviewTagFilters();
                 document.getElementById('notes-list').innerHTML = '<p class="empty-tip">请选择时间范围查看想法</p>';
             }
         }
@@ -620,7 +738,7 @@
                 const response = await fetch('api/notes', {
                     method: 'POST',
                     headers: getHeaders(),
-                    body: JSON.stringify({ content })
+                    body: JSON.stringify({ content, tags: Array.from(selectedTags) })
                 });
                 
                 if (response.ok) {
@@ -628,6 +746,10 @@
                     document.getElementById('note-input').value = '';
                     finalTranscript = '';
                     interimTranscript = '';
+                    // 清空已选标签并重新加载
+                    selectedTags.clear();
+                    renderSelectedTags();
+                    loadExistingTags();
                 } else {
                     showMessage(messageDiv, '记录失败，请重试', 'error');
                 }
@@ -649,6 +771,16 @@
         function setStatusFilter(status) {
             currentStatusFilter = status;
             document.querySelectorAll('.status-filters .status-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            if (hasTimeFilterSelected) {
+                queryNotes();
+            }
+        }
+        
+        // 设置标签筛选
+        function setTagFilter(tag) {
+            currentTagFilter = tag;
+            document.querySelectorAll('.tag-filters .tag-btn').forEach(btn => btn.classList.remove('active'));
             event.target.classList.add('active');
             if (hasTimeFilterSelected) {
                 queryNotes();
@@ -678,7 +810,7 @@
         }
         
         // 查询笔记
-        async function queryNotes() {
+        async function queryNotes(preserveSelection = false) {
             const notesList = document.getElementById('notes-list');
             const dateRange = getDateRange();
             
@@ -689,6 +821,9 @@
             if (currentStatusFilter && currentStatusFilter !== '全部') {
                 params.push(`status=${encodeURIComponent(currentStatusFilter)}`);
             }
+            if (currentTagFilter && currentTagFilter !== '全部') {
+                params.push(`tag=${encodeURIComponent(currentTagFilter)}`);
+            }
             if (params.length > 0) url += '?' + params.join('&');
             
             try {
@@ -697,7 +832,9 @@
                 });
                 const data = await response.json();
                 currentNotes = data.notes;
-                selectedNotes.clear();
+                if (!preserveSelection) {
+                    selectedNotes.clear();
+                }
                 updateBatchActions();
                 
                 if (data.notes.length === 0) {
@@ -705,7 +842,11 @@
                     return;
                 }
                 
-                notesList.innerHTML = data.notes.map(note => `
+                notesList.innerHTML = data.notes.map(note => {
+                    const tagsHtml = (note.tags && note.tags.length > 0)
+                        ? `<div class="note-tags">${note.tags.map(t => `<span class="note-tag">${escapeHtml(t)}<span class="note-tag-remove" onclick="removeNoteTag('${note.id}', '${escapeHtml(t)}')">×</span></span>`).join('')}</div>`
+                        : '';
+                    return `
                     <div class="note-item ${note.status === '已处理' ? 'processed' : ''}" data-id="${note.id}">
                         <div class="note-checkbox">
                             <input type="checkbox" onchange="toggleSelect('${note.id}')" ${selectedNotes.has(note.id) ? 'checked' : ''}>
@@ -721,9 +862,15 @@
                                 </div>
                             </div>
                             <div class="note-content">${escapeHtml(note.content)}</div>
+                            ${tagsHtml}
                         </div>
                     </div>
-                `).join('');
+                `}).join('');
+                // 同步选中状态到 DOM
+                selectedNotes.forEach(id => {
+                    const el = document.querySelector(`.note-item[data-id="${id}"]`);
+                    if (el) el.classList.add('selected');
+                });
             } catch (err) {
                 notesList.innerHTML = '<p class="empty-tip" style="color: #e74c3c;">查询失败，请重试</p>';
             }
@@ -731,10 +878,13 @@
         
         // 切换选择
         function toggleSelect(noteId) {
+            const noteEl = document.querySelector(`.note-item[data-id="${noteId}"]`);
             if (selectedNotes.has(noteId)) {
                 selectedNotes.delete(noteId);
+                if (noteEl) noteEl.classList.remove('selected');
             } else {
                 selectedNotes.add(noteId);
+                if (noteEl) noteEl.classList.add('selected');
             }
             updateBatchActions();
         }
@@ -791,6 +941,87 @@
             }
         }
         
+        // 从单条笔记删除标签
+        async function removeNoteTag(noteId, tag) {
+            try {
+                const response = await fetch(`api/notes/${noteId}/tag`, {
+                    method: 'DELETE',
+                    headers: getHeaders(),
+                    body: JSON.stringify({ tag })
+                });
+                if (response.ok) {
+                    queryNotes(true);
+                } else {
+                    alert('删除标签失败');
+                }
+            } catch (err) {
+                alert('网络错误，请重试');
+            }
+        }
+
+        // 批量添加标签 - 下拉菜单
+        function toggleBatchTagDropdown(e) {
+            e.stopPropagation();
+            const dropdown = document.getElementById('batch-tag-dropdown');
+            if (!dropdown.classList.contains('show')) {
+                renderBatchTagDropdown();
+            }
+            dropdown.classList.toggle('show');
+        }
+
+        // 点击页面其他地方关闭批量标签下拉
+        document.addEventListener('click', function(e) {
+            const dropdown = document.getElementById('batch-tag-dropdown');
+            if (dropdown && dropdown.classList.contains('show')) {
+                if (!e.target.closest('.batch-tag-dropdown-wrapper')) {
+                    dropdown.classList.remove('show');
+                }
+            }
+        });
+
+        // 渲染批量标签下拉菜单
+        function renderBatchTagDropdown() {
+            const dropdown = document.getElementById('batch-tag-dropdown');
+            if (existingTags.length === 0) {
+                dropdown.innerHTML = '<p class="batch-tag-empty">暂无标签</p>';
+                return;
+            }
+            dropdown.innerHTML = existingTags.map(tag => `
+                <label class="batch-tag-item">
+                    <input type="checkbox" value="${escapeHtml(tag)}">
+                    <span>${escapeHtml(tag)}</span>
+                </label>
+            `).join('') + `<button class="batch-tag-confirm-btn" onclick="batchAddTags()">确认添加</button>`;
+        }
+
+        // 执行批量添加标签
+        async function batchAddTags() {
+            const checkedTags = Array.from(document.querySelectorAll('#batch-tag-dropdown input[type="checkbox"]:checked'))
+                .map(cb => cb.value);
+            if (checkedTags.length === 0) {
+                alert('请至少选择一个标签');
+                return;
+            }
+            if (selectedNotes.size === 0) return;
+            try {
+                const response = await fetch('api/notes/batch/tags', {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify({ ids: Array.from(selectedNotes), tags: checkedTags })
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    document.getElementById('batch-tag-dropdown').classList.remove('show');
+                    queryNotes(true);
+                    loadExistingTags();
+                } else {
+                    alert(data.error || '添加标签失败');
+                }
+            } catch (err) {
+                alert('网络错误，请重试');
+            }
+        }
+
         // 批量删除
         async function batchDelete() {
             if (selectedNotes.size === 0) return;
@@ -821,6 +1052,520 @@
                 element.textContent = '';
                 element.className = 'message';
             }, 3000);
+        }
+        
+        // ==================== 标签管理（记录页） ====================
+        
+        // 加载当前用户已有标签
+        async function loadExistingTags() {
+            try {
+                const response = await fetch('api/tags', { headers: getHeaders() });
+                const data = await response.json();
+                if (response.ok) {
+                    existingTags = data.tags || [];
+                    renderTagDropdown();
+                }
+            } catch (err) {
+                console.error('加载标签失败:', err);
+            }
+        }
+        
+        // 渲染标签下拉复选框
+        function renderTagDropdown() {
+            const dropdown = document.getElementById('tag-dropdown');
+            if (existingTags.length === 0) {
+                dropdown.innerHTML = '<p class="tag-dropdown-empty">暂无标签</p>';
+                return;
+            }
+            dropdown.innerHTML = existingTags.map(tag => `
+                <label class="tag-dropdown-item">
+                    <input type="checkbox" value="${escapeHtml(tag)}" ${selectedTags.has(tag) ? 'checked' : ''} onchange="toggleTagFromDropdown('${escapeHtml(tag)}', this.checked)">
+                    <span>${escapeHtml(tag)}</span>
+                </label>
+            `).join('');
+        }
+        
+        // 切换下拉框显示/隐藏
+        function toggleTagDropdown(e) {
+            e.stopPropagation();
+            const dropdown = document.getElementById('tag-dropdown');
+            dropdown.classList.toggle('show');
+        }
+        
+        // 点击页面其他地方关闭下拉
+        document.addEventListener('click', function(e) {
+            const dropdown = document.getElementById('tag-dropdown');
+            if (dropdown && dropdown.classList.contains('show')) {
+                if (!e.target.closest('.tag-dropdown-wrapper')) {
+                    dropdown.classList.remove('show');
+                }
+            }
+        });
+        
+        // 从下拉框勾选/取消标签
+        function toggleTagFromDropdown(tag, checked) {
+            if (checked) {
+                selectedTags.add(tag);
+            } else {
+                selectedTags.delete(tag);
+            }
+            renderSelectedTags();
+        }
+        
+        // 输入框按键处理（回车添加标签）
+        function handleTagInputKeydown(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                addTagFromInput();
+            }
+        }
+        
+        // 输入框内容变化时，显示/隐藏"添加"按钮
+        function onTagInputChange() {
+            const input = document.getElementById('tag-input');
+            const addBtn = document.getElementById('tag-add-btn');
+            if (input.value.trim()) {
+                addBtn.classList.add('show');
+            } else {
+                addBtn.classList.remove('show');
+            }
+        }
+        
+        // 从输入框添加标签
+        function addTagFromInput() {
+            const input = document.getElementById('tag-input');
+            const tag = input.value.trim();
+            if (tag) {
+                addTag(tag);
+                input.value = '';
+                document.getElementById('tag-add-btn').classList.remove('show');
+            }
+        }
+        
+        // 添加标签（防重复，实时更新标签库，持久化到服务器）
+        function addTag(tag) {
+            tag = tag.trim();
+            if (!tag) return;
+            // 防重复：忽略大小写比较
+            for (let t of selectedTags) {
+                if (t.toLowerCase() === tag.toLowerCase()) return;
+            }
+            selectedTags.add(tag);
+            // 如果是新标签，加入已有标签库（实时显示在下拉和回顾页）
+            let isNew = true;
+            for (let t of existingTags) {
+                if (t.toLowerCase() === tag.toLowerCase()) { isNew = false; break; }
+            }
+            if (isNew) {
+                existingTags.push(tag);
+                existingTags.sort();
+                renderTagDropdown();
+                updateReviewTagFilters();
+                // 持久化到服务器
+                fetch('api/tags', {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify({ tag })
+                }).catch(err => console.error('保存标签失败:', err));
+            }
+            renderSelectedTags();
+            renderTagDropdown();
+        }
+        
+        // 移除已选标签
+        function removeTag(tag) {
+            selectedTags.delete(tag);
+            renderSelectedTags();
+            renderTagDropdown();
+        }
+        
+        // 渲染已选标签 chips
+        function renderSelectedTags() {
+            const container = document.getElementById('selected-tags');
+            if (selectedTags.size === 0) {
+                container.innerHTML = '';
+                return;
+            }
+            container.innerHTML = Array.from(selectedTags).map(tag => `
+                <span class="tag-chip">
+                    ${escapeHtml(tag)}
+                    <span class="tag-chip-remove" onclick="removeTag('${escapeHtml(tag)}')">×</span>
+                </span>
+            `).join('');
+        }
+        
+        // ==================== 标签筛选（回顾页） ====================
+        
+        // 加载回顾页标签筛选按钮
+        async function loadReviewTagFilters() {
+            try {
+                const response = await fetch('api/tags', { headers: getHeaders() });
+                const data = await response.json();
+                existingTags = data.tags || [];
+                renderReviewTagFilters();
+            } catch (err) {
+                console.error('加载标签筛选失败:', err);
+            }
+        }
+        
+        // 实时更新回顾页标签筛选按钮（用已有标签数据）
+        function updateReviewTagFilters() {
+            renderReviewTagFilters();
+        }
+        
+        // 渲染回顾页标签筛选按钮
+        function renderReviewTagFilters() {
+            const container = document.getElementById('tag-filters');
+            if (!container) return;
+            let html = `<button class="tag-btn ${currentTagFilter === '全部' ? 'active' : ''}" onclick="setTagFilter('全部')">全部</button>`;
+            html += existingTags.map(tag => 
+                `<button class="tag-btn ${currentTagFilter === tag ? 'active' : ''}" onclick="setTagFilter('${escapeHtml(tag)}')">${escapeHtml(tag)}</button>`
+            ).join('');
+            container.innerHTML = html;
+        }
+        
+        // ==================== 导出功能 ====================
+        
+        let exportTimeRange = 'all';
+        
+        // 设置导出时间范围
+        function setExportTimeRange(range, btn) {
+            exportTimeRange = range;
+            if (btn) {
+                document.querySelectorAll('.export-time-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            } else {
+                // 自定义天数输入
+                document.querySelectorAll('.export-time-btn').forEach(b => b.classList.remove('active'));
+            }
+            updateExportPreview();
+        }
+        
+        // 计算导出日期范围
+        function getExportDateRange() {
+            const today = new Date();
+            const todayStr = today.toISOString().split('T')[0];
+            switch (exportTimeRange) {
+                case 'today':
+                    return { start: todayStr, end: todayStr };
+                case '3days': {
+                    const d = new Date(today);
+                    d.setDate(today.getDate() - 2);
+                    return { start: d.toISOString().split('T')[0], end: todayStr };
+                }
+                case 'week': {
+                    const d = new Date(today);
+                    d.setDate(today.getDate() - 6);
+                    return { start: d.toISOString().split('T')[0], end: todayStr };
+                }
+                case 'custom': {
+                    const days = parseInt(document.getElementById('export-custom-days').value) || 1;
+                    const d = new Date(today);
+                    d.setDate(today.getDate() - (days - 1));
+                    return { start: d.toISOString().split('T')[0], end: todayStr };
+                }
+                case 'all':
+                default:
+                    return { start: '', end: '' };
+            }
+        }
+        
+        // 获取当前选择的标签参数
+        function getExportTagsParam() {
+            const allCheckbox = document.querySelector('#export-tags-list input[value="all"]');
+            if (!allCheckbox || allCheckbox.checked) return 'all';
+            const selectedExportTags = Array.from(document.querySelectorAll('#export-tags-list input[type="checkbox"]'))
+                .filter(cb => cb.value !== 'all' && cb.checked)
+                .map(cb => cb.value);
+            return selectedExportTags.length > 0 ? selectedExportTags.join(',') : 'all';
+        }
+        
+        // 实时更新导出预览条数
+        let exportPreviewTimer = null;
+        function updateExportPreview() {
+            clearTimeout(exportPreviewTimer);
+            exportPreviewTimer = setTimeout(async () => {
+                const dateRange = getExportDateRange();
+                const tagsParam = getExportTagsParam();
+                const params = [];
+                if (dateRange.start) params.push(`start_date=${dateRange.start}`);
+                if (dateRange.end) params.push(`end_date=${dateRange.end}`);
+                params.push(`tags=${encodeURIComponent(tagsParam)}`);
+                const previewEl = document.getElementById('export-preview');
+                previewEl.textContent = '计算中...';
+                try {
+                    const response = await fetch('api/export/preview?' + params.join('&'), { headers: getHeaders() });
+                    const data = await response.json();
+                    if (response.ok) {
+                        previewEl.textContent = `将导出 ${data.count} 条记录`;
+                    } else {
+                        previewEl.textContent = '获取条数失败';
+                    }
+                } catch (err) {
+                    previewEl.textContent = '网络错误';
+                }
+            }, 200);
+        }
+        
+        // 打开导出弹窗
+        async function openExportModal() {
+            exportTimeRange = 'all';
+            document.querySelectorAll('.export-time-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector('.export-time-btn[data-range="all"]').classList.add('active');
+            document.getElementById('export-custom-days').value = '';
+            // 加载标签列表
+            try {
+                const response = await fetch('api/tags', { headers: getHeaders() });
+                const data = await response.json();
+                const tags = data.tags || [];
+                const container = document.getElementById('export-tags-list');
+                let html = '<label class="export-tag-item"><input type="checkbox" value="all" checked onchange="onExportTagAllChange(); updateExportPreview()"> 全部</label>';
+                html += tags.map(tag => 
+                    `<label class="export-tag-item"><input type="checkbox" value="${escapeHtml(tag)}" onchange="onExportTagItemChange(); updateExportPreview()"> ${escapeHtml(tag)}</label>`
+                ).join('');
+                container.innerHTML = html;
+            } catch (err) {
+                console.error('加载标签失败:', err);
+            }
+            document.getElementById('export-modal').style.display = 'flex';
+            updateExportPreview();
+        }
+        
+        // 关闭导出弹窗
+        function closeExportModal() {
+            document.getElementById('export-modal').style.display = 'none';
+        }
+        
+        // "全部"复选框变化
+        function onExportTagAllChange() {
+            const allCheckbox = document.querySelector('#export-tags-list input[value="all"]');
+            const isChecked = allCheckbox.checked;
+            document.querySelectorAll('#export-tags-list input[type="checkbox"]').forEach(cb => {
+                if (cb.value !== 'all') {
+                    cb.checked = false;
+                    cb.disabled = isChecked;
+                }
+            });
+        }
+        
+        // 单个标签复选框变化
+        function onExportTagItemChange() {
+            const allCheckbox = document.querySelector('#export-tags-list input[value="all"]');
+            const anyItemChecked = Array.from(document.querySelectorAll('#export-tags-list input[type="checkbox"]'))
+                .some(cb => cb.value !== 'all' && cb.checked);
+            allCheckbox.checked = !anyItemChecked;
+        }
+        
+        // 执行导出
+        async function doExport() {
+            const dateRange = getExportDateRange();
+            const tagsParam = getExportTagsParam();
+            
+            if (tagsParam === 'all') {
+                // "全部"已选中，无需检查
+            } else {
+                const selectedExportTags = Array.from(document.querySelectorAll('#export-tags-list input[type="checkbox"]'))
+                    .filter(cb => cb.value !== 'all' && cb.checked)
+                    .map(cb => cb.value);
+                if (selectedExportTags.length === 0) {
+                    alert('请至少选择一个标签，或选择"全部"');
+                    return;
+                }
+            }
+            
+            const params = [];
+            if (dateRange.start) params.push(`start_date=${dateRange.start}`);
+            if (dateRange.end) params.push(`end_date=${dateRange.end}`);
+            params.push(`tags=${encodeURIComponent(tagsParam)}`);
+            
+            try {
+                const response = await fetch('api/export?' + params.join('&'), { headers: getHeaders() });
+                const data = await response.json();
+                if (response.ok) {
+                    // 触发下载
+                    const blob = new Blob([data.content], { type: 'text/markdown;charset=utf-8' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = data.filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    closeExportModal();
+                    alert('导出成功！');
+                } else {
+                    alert(data.error || '导出失败');
+                }
+            } catch (err) {
+                alert('网络错误，导出失败');
+            }
+        }
+        
+        // ==================== 导入功能 ====================
+        
+        async function handleImport(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            if (!confirm(`确定要导入文件「${file.name}」吗？\n导入的笔记时间将记为当前时间，状态为已处理。`)) {
+                event.target.value = '';
+                return;
+            }
+            
+            try {
+                const content = await file.text();
+                const response = await fetch('api/import', {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify({ content })
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    alert(data.message);
+                    // 如果当前在回顾页，刷新
+                    if (hasTimeFilterSelected) {
+                        queryNotes();
+                    }
+                    loadExistingTags();
+                } else {
+                    alert(data.error || '导入失败');
+                }
+            } catch (err) {
+                alert('网络错误，导入失败');
+            }
+            event.target.value = '';
+        }
+        
+        // ==================== 标签管理弹窗 ====================
+        
+        // 打开标签管理弹窗
+        async function openTagManageModal() {
+            document.getElementById('tag-manage-new-input').value = '';
+            await loadExistingTags();
+            renderTagManageList();
+            document.getElementById('tag-manage-modal').style.display = 'flex';
+        }
+        
+        // 关闭标签管理弹窗
+        function closeTagManageModal() {
+            document.getElementById('tag-manage-modal').style.display = 'none';
+        }
+        
+        // 渲染标签管理列表
+        function renderTagManageList() {
+            const list = document.getElementById('tag-manage-list');
+            if (existingTags.length === 0) {
+                list.innerHTML = '<p class="empty-tip">暂无标签</p>';
+                return;
+            }
+            list.innerHTML = existingTags.map(tag => `
+                <div class="tag-manage-item">
+                    <span class="tag-manage-item-name">${escapeHtml(tag)}</span>
+                    <div class="tag-manage-item-actions">
+                        <button class="tag-manage-action-btn rename" onclick="tagManageRename('${escapeHtml(tag)}')">重命名</button>
+                        <button class="tag-manage-action-btn delete" onclick="tagManageDelete('${escapeHtml(tag)}')">删除</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // 新增标签
+        async function tagManageAdd() {
+            const input = document.getElementById('tag-manage-new-input');
+            const tag = input.value.trim();
+            if (!tag) return;
+            try {
+                const response = await fetch('api/tags', {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify({ tag })
+                });
+                if (response.ok) {
+                    input.value = '';
+                    await loadExistingTags();
+                    renderTagManageList();
+                    updateReviewTagFilters();
+                    renderTagDropdown();
+                } else {
+                    const data = await response.json();
+                    alert(data.error || '添加失败');
+                }
+            } catch (err) {
+                alert('网络错误，请重试');
+            }
+        }
+        
+        // 重命名标签
+        async function tagManageRename(oldTag) {
+            const newTag = prompt(`将标签「${oldTag}」重命名为：`, oldTag);
+            if (!newTag || newTag.trim() === oldTag) return;
+            try {
+                const response = await fetch('api/tags/rename', {
+                    method: 'PUT',
+                    headers: getHeaders(),
+                    body: JSON.stringify({ old_tag: oldTag, new_tag: newTag.trim() })
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    await loadExistingTags();
+                    renderTagManageList();
+                    updateReviewTagFilters();
+                    renderTagDropdown();
+                    if (hasTimeFilterSelected) queryNotes(true);
+                    alert(data.message);
+                } else {
+                    alert(data.error || '重命名失败');
+                }
+            } catch (err) {
+                alert('网络错误，请重试');
+            }
+        }
+        
+        // 删除标签
+        async function tagManageDelete(tag) {
+            try {
+                // 先尝试不带 force
+                const response = await fetch('api/tags/delete', {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify({ tag, force: false })
+                });
+                const data = await response.json();
+                
+                if (response.status === 409 && data.need_confirm) {
+                    // 有笔记使用，需确认
+                    if (confirm(`标签「${tag}」被 ${data.note_count} 条笔记使用，删除后将同时从这些笔记中移除该标签。确认删除？`)) {
+                        const response2 = await fetch('api/tags/delete', {
+                            method: 'POST',
+                            headers: getHeaders(),
+                            body: JSON.stringify({ tag, force: true })
+                        });
+                        const data2 = await response2.json();
+                        if (response2.ok) {
+                            await loadExistingTags();
+                            renderTagManageList();
+                            updateReviewTagFilters();
+                            renderTagDropdown();
+                            if (hasTimeFilterSelected) queryNotes(true);
+                            alert(data2.message);
+                        } else {
+                            alert(data2.error || '删除失败');
+                        }
+                    }
+                } else if (response.ok) {
+                    await loadExistingTags();
+                    renderTagManageList();
+                    updateReviewTagFilters();
+                    renderTagDropdown();
+                    if (hasTimeFilterSelected) queryNotes(true);
+                    alert(data.message);
+                } else {
+                    alert(data.error || '删除失败');
+                }
+            } catch (err) {
+                alert('网络错误，请重试');
+            }
         }
         
         // HTML转义

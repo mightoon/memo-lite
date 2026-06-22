@@ -39,6 +39,7 @@ app.wsgi_app = PrefixMiddleware(app.wsgi_app)
 
 NOTES_FILE = "notes.txt"
 USERS_FILE = "users.txt"
+TAGS_FILE = "tags.txt"
 
 # 确保文件存在
 def ensure_file(filename):
@@ -153,6 +154,41 @@ def write_notes(notes):
     with open(NOTES_FILE, "w", encoding="utf-8") as f:
         for note in notes:
             f.write(json.dumps(note, ensure_ascii=False) + "\n")
+
+# 读取标签库（持久化的用户标签）
+def read_tag_library(user_openid=None):
+    """读取标签库，返回 {(openid, tag)} 的列表"""
+    ensure_file(TAGS_FILE)
+    entries = []
+    with open(TAGS_FILE, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+                if user_openid and entry.get('openid') != user_openid:
+                    continue
+                entries.append(entry)
+            except:
+                pass
+    return entries
+
+# 写入一个标签到标签库
+def write_tag_to_library(openid, tag):
+    """将标签写入用户的标签库（防重复）"""
+    tag = tag.strip()
+    if not tag:
+        return
+    entries = read_tag_library()
+    # 防重复（同用户同名标签）
+    for e in entries:
+        if e.get('openid') == openid and e.get('tag') == tag:
+            return
+    entries.append({"openid": openid, "tag": tag})
+    with open(TAGS_FILE, "w", encoding="utf-8") as f:
+        for e in entries:
+            f.write(json.dumps(e, ensure_ascii=False) + "\n")
 
 @app.route("/")
 def index():
@@ -322,6 +358,7 @@ def web_login():
 def add_note():
     data = request.get_json()
     content = data.get("content", "").strip()
+    tags = data.get("tags", [])
     user_id = get_user_identifier()  # 兼容小程序和浏览器
     
     if not user_id:
@@ -329,6 +366,10 @@ def add_note():
     
     if not content:
         return jsonify({"error": "内容不能为空"}), 400
+    
+    # 标签去重（保留顺序，去除空白项）
+    seen = set()
+    tags = [t.strip() for t in tags if t.strip() and not (t.strip() in seen or seen.add(t.strip()))]
     
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     note_id = timestamp.replace(" ", "_").replace(":", "-")
@@ -338,11 +379,16 @@ def add_note():
         "timestamp": timestamp,
         "content": content,
         "status": "待处理",
-        "user_openid": user_id  # 绑定用户标识
+        "user_openid": user_id,  # 绑定用户标识
+        "tags": tags
     }
     
     with open(NOTES_FILE, "a", encoding="utf-8") as f:
         f.write(json.dumps(note, ensure_ascii=False) + "\n")
+    
+    # 将新标签持久化到标签库
+    for tag in tags:
+        write_tag_to_library(user_id, tag)
     
     return jsonify({"message": "记录成功", "timestamp": timestamp, "id": note_id}), 201
 
@@ -351,6 +397,7 @@ def get_notes():
     start_date = request.args.get("start_date")
     end_date = request.args.get("end_date")
     status_filter = request.args.get("status")  # 待处理, 已处理, 全部
+    tag_filter = request.args.get("tag")  # 标签筛选
     user_id = get_user_identifier()  # 兼容小程序和浏览器
     
     if not user_id:
@@ -362,6 +409,10 @@ def get_notes():
     filtered_notes = []
     
     for note in notes:
+        # 兼容旧笔记：确保 tags 字段存在
+        if 'tags' not in note:
+            note['tags'] = []
+        
         note_time = datetime.strptime(note["timestamp"], "%Y-%m-%d %H:%M:%S")
         
         # 时间筛选
@@ -378,6 +429,11 @@ def get_notes():
         # 状态筛选
         if status_filter and status_filter != "全部":
             if note.get("status", "待处理") != status_filter:
+                continue
+        
+        # 标签筛选
+        if tag_filter and tag_filter != "全部":
+            if tag_filter not in note.get('tags', []):
                 continue
         
         filtered_notes.append(note)
@@ -476,6 +532,353 @@ def batch_delete_notes():
     
     write_notes(notes)
     return jsonify({"message": f"成功删除 {deleted_count} 条笔记", "deleted": deleted_count})
+
+# ==================== 标签接口 ====================
+@app.route("/api/tags", methods=["GET"])
+def get_tags():
+    """获取当前用户的所有标签（标签库 + 笔记中聚合，去重）"""
+    user_id = get_user_identifier()
+    if not user_id:
+        return jsonify({"error": "请先登录"}), 401
+    
+    user = get_current_user()
+    is_admin = user and user.get('role') == 'admin'
+    
+    tags = set()
+    
+    # 1. 从标签库读取
+    if is_admin:
+        lib_entries = read_tag_library()  # 所有用户
+    else:
+        lib_entries = read_tag_library(user_openid=user_id)
+    for entry in lib_entries:
+        tags.add(entry.get('tag', ''))
+    
+    # 2. 从笔记中聚合（兼容旧数据）
+    if is_admin:
+        notes = read_notes()
+    else:
+        notes = read_notes(user_openid=user_id)
+    for note in notes:
+        for tag in note.get('tags', []):
+            tags.add(tag)
+    
+    tags.discard('')
+    return jsonify({"tags": sorted(tags)})
+
+
+@app.route("/api/tags", methods=["POST"])
+def add_tag():
+    """添加标签到当前用户的标签库（持久化）"""
+    user_id = get_user_identifier()
+    if not user_id:
+        return jsonify({"error": "请先登录"}), 401
+    data = request.get_json()
+    tag = data.get("tag", "").strip()
+    if not tag:
+        return jsonify({"error": "标签不能为空"}), 400
+    write_tag_to_library(user_id, tag)
+    return jsonify({"message": "标签添加成功", "tag": tag}), 201
+
+
+@app.route("/api/notes/<note_id>/tag", methods=["DELETE"])
+def remove_note_tag(note_id):
+    """从某条笔记中删除一个标签"""
+    user_id = get_user_identifier()
+    if not user_id:
+        return jsonify({"error": "请先登录"}), 401
+    data = request.get_json()
+    tag = data.get("tag", "").strip()
+    if not tag:
+        return jsonify({"error": "标签不能为空"}), 400
+    
+    user = get_current_user()
+    is_admin = user and user.get('role') == 'admin'
+    
+    all_notes = read_notes()
+    found = False
+    for note in all_notes:
+        if note["id"] == note_id and (is_admin or note.get('user_openid') == user_id):
+            if 'tags' in note and tag in note['tags']:
+                note['tags'] = [t for t in note['tags'] if t != tag]
+                found = True
+            break
+    if not found:
+        return jsonify({"error": "笔记或标签不存在"}), 404
+    write_notes(all_notes)
+    return jsonify({"message": "标签删除成功"})
+
+
+@app.route("/api/notes/batch/tags", methods=["POST"])
+def batch_add_tags():
+    """为多条笔记批量添加标签"""
+    user_id = get_user_identifier()
+    if not user_id:
+        return jsonify({"error": "请先登录"}), 401
+    data = request.get_json()
+    note_ids = data.get("ids", [])
+    tags = data.get("tags", [])
+    
+    if not note_ids:
+        return jsonify({"error": "请选择笔记"}), 400
+    if not tags:
+        return jsonify({"error": "请选择标签"}), 400
+    
+    # 标签去重
+    seen = set()
+    tags = [t.strip() for t in tags if t.strip() and not (t.strip() in seen or seen.add(t.strip()))]
+    
+    user = get_current_user()
+    is_admin = user and user.get('role') == 'admin'
+    
+    all_notes = read_notes()
+    updated_count = 0
+    for note in all_notes:
+        if note["id"] in note_ids and (is_admin or note.get('user_openid') == user_id):
+            if 'tags' not in note:
+                note['tags'] = []
+            for tag in tags:
+                if tag not in note['tags']:
+                    note['tags'].append(tag)
+            updated_count += 1
+    
+    write_notes(all_notes)
+    
+    # 将新标签持久化到当前用户的标签库
+    for tag in tags:
+        write_tag_to_library(user_id, tag)
+    
+    return jsonify({"message": f"成功为 {updated_count} 条笔记添加标签", "updated": updated_count})
+
+
+@app.route("/api/tags/rename", methods=["PUT"])
+def rename_tag():
+    """重命名标签：更新标签库及所有相关笔记中的标签（仅限当前用户，admin仅更新自己创建的标签库记录但笔记按权限）"""
+    user_id = get_user_identifier()
+    if not user_id:
+        return jsonify({"error": "请先登录"}), 401
+    data = request.get_json()
+    old_tag = data.get("old_tag", "").strip()
+    new_tag = data.get("new_tag", "").strip()
+    if not old_tag or not new_tag:
+        return jsonify({"error": "旧标签和新标签不能为空"}), 400
+    if old_tag == new_tag:
+        return jsonify({"error": "新标签与旧标签相同"}), 400
+    
+    user = get_current_user()
+    is_admin = user and user.get('role') == 'admin'
+    
+    # 1. 更新标签库
+    lib_entries = read_tag_library()
+    for entry in lib_entries:
+        if entry.get('openid') == user_id and entry.get('tag') == old_tag:
+            entry['tag'] = new_tag
+    with open(TAGS_FILE, "w", encoding="utf-8") as f:
+        for e in lib_entries:
+            f.write(json.dumps(e, ensure_ascii=False) + "\n")
+    
+    # 2. 更新相关笔记中的标签
+    all_notes = read_notes()
+    updated_notes = 0
+    for note in all_notes:
+        # 普通用户只能改自己的笔记；admin 可以改所有
+        if is_admin or note.get('user_openid') == user_id:
+            if 'tags' in note and old_tag in note['tags']:
+                # 替换为新标签，避免重复
+                note['tags'] = [new_tag if t == old_tag else t for t in note['tags']]
+                # 去重
+                seen = set()
+                note['tags'] = [t for t in note['tags'] if not (t in seen or seen.add(t))]
+                updated_notes += 1
+    write_notes(all_notes)
+    
+    return jsonify({"message": f"标签已重命名，更新了 {updated_notes} 条笔记", "updated_notes": updated_notes})
+
+
+@app.route("/api/tags/delete", methods=["POST"])
+def delete_tag():
+    """删除标签：从标签库中删除，并提示是否从笔记中移除"""
+    user_id = get_user_identifier()
+    if not user_id:
+        return jsonify({"error": "请先登录"}), 401
+    data = request.get_json()
+    tag = data.get("tag", "").strip()
+    force = data.get("force", False)  # 是否强制从笔记中移除
+    if not tag:
+        return jsonify({"error": "标签不能为空"}), 400
+    
+    user = get_current_user()
+    is_admin = user and user.get('role') == 'admin'
+    
+    # 检查是否有笔记使用该标签
+    all_notes = read_notes()
+    note_count = 0
+    for note in all_notes:
+        if is_admin or note.get('user_openid') == user_id:
+            if tag in note.get('tags', []):
+                note_count += 1
+    
+    if note_count > 0 and not force:
+        return jsonify({"error": f"有 {note_count} 条笔记正在使用该标签，确认要删除吗？", "note_count": note_count, "need_confirm": True}), 409
+    
+    # 确认删除：从标签库移除
+    lib_entries = read_tag_library()
+    lib_entries = [e for e in lib_entries if not (e.get('openid') == user_id and e.get('tag') == tag)]
+    with open(TAGS_FILE, "w", encoding="utf-8") as f:
+        for e in lib_entries:
+            f.write(json.dumps(e, ensure_ascii=False) + "\n")
+    
+    # 如果 force=True，从笔记中移除该标签
+    removed_from_notes = 0
+    if force and note_count > 0:
+        for note in all_notes:
+            if is_admin or note.get('user_openid') == user_id:
+                if tag in note.get('tags', []):
+                    note['tags'] = [t for t in note['tags'] if t != tag]
+                    removed_from_notes += 1
+        write_notes(all_notes)
+    
+    return jsonify({"message": f"标签已删除", "removed_from_notes": removed_from_notes, "note_count": note_count})
+
+
+# ==================== 导出接口 ====================
+def get_export_filtered_notes(user_id, start_date, end_date, selected_tags):
+    """根据筛选条件获取要导出的笔记（admin 导出所有用户）"""
+    user = get_current_user()
+    is_admin = user and user.get('role') == 'admin'
+    # admin 导出所有用户的记录；普通用户仅导出自己的
+    notes = read_notes(user_openid=None if is_admin else user_id)
+    
+    filtered = []
+    for note in notes:
+        # 兼容旧笔记
+        if 'tags' not in note:
+            note['tags'] = []
+        note_time = datetime.strptime(note["timestamp"], "%Y-%m-%d %H:%M:%S")
+        if start_date:
+            start = datetime.strptime(start_date, "%Y-%m-%d")
+            if note_time.date() < start.date():
+                continue
+        if end_date:
+            end = datetime.strptime(end_date, "%Y-%m-%d")
+            if note_time.date() > end.date():
+                continue
+        # 标签筛选
+        if selected_tags and selected_tags != "all":
+            tag_list = [t.strip() for t in selected_tags.split(",") if t.strip()]
+            if not any(t in note.get('tags', []) for t in tag_list):
+                continue
+        filtered.append(note)
+    return filtered
+
+
+@app.route("/api/export/preview", methods=["GET"])
+def export_preview():
+    """预览导出：返回符合筛选条件的笔记条数"""
+    user_id = get_user_identifier()
+    if not user_id:
+        return jsonify({"error": "请先登录"}), 401
+    start_date = request.args.get("start_date", "")
+    end_date = request.args.get("end_date", "")
+    selected_tags = request.args.get("tags", "all")
+    filtered = get_export_filtered_notes(user_id, start_date, end_date, selected_tags)
+    return jsonify({"count": len(filtered)})
+
+
+@app.route("/api/export", methods=["GET"])
+def export_notes():
+    """导出笔记为 md，按标签分类（admin 导出所有用户）"""
+    user_id = get_user_identifier()
+    if not user_id:
+        return jsonify({"error": "请先登录"}), 401
+    
+    start_date = request.args.get("start_date", "")
+    end_date = request.args.get("end_date", "")
+    selected_tags = request.args.get("tags", "all")
+    
+    filtered = get_export_filtered_notes(user_id, start_date, end_date, selected_tags)
+    
+    # 按标签分组
+    tag_groups = {}  # tag -> list of contents
+    untagged = []
+    for note in filtered:
+        tags = note.get('tags', [])
+        if tags:
+            for tag in tags:
+                tag_groups.setdefault(tag, []).append(note['content'])
+        else:
+            untagged.append(note['content'])
+    
+    # 构建 md
+    lines = []
+    for tag in sorted(tag_groups.keys()):
+        lines.append(f"## {tag}")
+        lines.append("")
+        for content in tag_groups[tag]:
+            lines.append(f"- {content}")
+        lines.append("")
+    
+    if untagged:
+        lines.append("## 未分类")
+        lines.append("")
+        for content in untagged:
+            lines.append(f"- {content}")
+        lines.append("")
+    
+    md_content = "\n".join(lines).strip() + "\n"
+    filename = f"notes_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
+    
+    return jsonify({"content": md_content, "filename": filename})
+
+
+# ==================== 导入接口 ====================
+@app.route("/api/import", methods=["POST"])
+def import_notes():
+    """从 md 文件导入笔记，时间记为导入时间，状态为已处理"""
+    user_id = get_user_identifier()
+    if not user_id:
+        return jsonify({"error": "请先登录"}), 401
+    
+    data = request.get_json()
+    md_content = data.get("content", "")
+    
+    if not md_content.strip():
+        return jsonify({"error": "导入内容为空"}), 400
+    
+    # 解析 md：## 标签 为标题，- 内容 为笔记
+    current_tag = None
+    imported_count = 0
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    new_notes = []
+    
+    for line in md_content.split("\n"):
+        line = line.rstrip()
+        if line.startswith("## "):
+            current_tag = line[3:].strip()
+            if current_tag == "未分类":
+                current_tag = None
+        elif line.startswith("- "):
+            content = line[2:].strip()
+            if content:
+                note_id = (timestamp + "_" + str(imported_count)).replace(" ", "_").replace(":", "-")
+                note = {
+                    "id": note_id,
+                    "timestamp": timestamp,
+                    "content": content,
+                    "status": "已处理",
+                    "user_openid": user_id,
+                    "tags": [current_tag] if current_tag else []
+                }
+                new_notes.append(note)
+                imported_count += 1
+    
+    if new_notes:
+        with open(NOTES_FILE, "a", encoding="utf-8") as f:
+            for note in new_notes:
+                f.write(json.dumps(note, ensure_ascii=False) + "\n")
+    
+    return jsonify({"message": f"成功导入 {imported_count} 条笔记", "imported": imported_count})
+
 
 ensure_admin_user()
 
