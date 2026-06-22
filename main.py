@@ -884,3 +884,6 @@ ensure_admin_user()
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
+else:
+    # 生产环境由 Gunicorn 导入 main:app，不执行 app.run()
+    pass

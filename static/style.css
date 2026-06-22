@@ -33,18 +33,15 @@ body {
     margin-bottom: 40px;
 }
 
-.auth-app-name {
-    font-size: 36px;
-    font-weight: 400;
-    color: #000000;
+.auth-logo {
+    height: 128px;
+    width: auto;
     margin-bottom: 8px;
-    letter-spacing: -0.5px;
-    background: transparent;
 }
 
 .auth-slogan {
-    font-size: 15px;
-    color: #8b5cf6;
+    font-size: 20px;
+    color: #8b7355;
     font-weight: 700;
 }
 
@@ -82,7 +79,7 @@ body {
 .form-group input {
     width: 100%;
     padding: 10px 12px;
-    border: 2px solid #c4b5fd;
+    border: 2px solid #d4c9b5;
     border-radius: 4px;
     font-size: 15px;
     transition: border-color 0.2s, background 0.2s;
@@ -92,7 +89,7 @@ body {
 
 .form-group input:focus {
     outline: none;
-    border-color: #8b5cf6;
+    border-color: #8b7355;
     background: #ffffff;
 }
 
@@ -109,8 +106,8 @@ body {
     margin: 30px auto 0;
     padding: 12px;
     background: #ffffff;
-    color: #8b5cf6;
-    border: 2px solid #8b5cf6;
+    color: #8b7355;
+    border: 2px solid #8b7355;
     border-radius: 999px;
     font-size: 15px;
     font-weight: 400;
@@ -119,7 +116,7 @@ body {
 }
 
 .auth-submit-btn:hover {
-    background: #f5f3ff;
+    background: #f5f0e8;
 }
 
 .auth-switch {
@@ -1301,4 +1298,87 @@ textarea:focus {
 .tag-manage-action-btn.delete:hover {
     background: #dc3545;
     color: white;
+}
+
+/* ========== 设置弹窗 ========== */
+.settings-timeout-options {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+.settings-timeout-btn {
+    padding: 6px 14px;
+    border: 1px solid #ddd;
+    background: white;
+    color: #666;
+    border-radius: 20px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.settings-timeout-btn:hover {
+    border-color: #667eea;
+    color: #667eea;
+}
+
+.settings-timeout-btn.active {
+    background: #667eea;
+    color: white;
+    border-color: #667eea;
+}
+
+.settings-custom-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+}
+
+.settings-custom-label {
+    font-size: 13px;
+    color: #666;
+}
+
+.settings-custom-input {
+    width: 60px;
+    padding: 6px 8px;
+    border: 2px solid #e0e0e0;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+}
+
+.settings-custom-input:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.settings-custom-select {
+    padding: 6px 8px;
+    border: 2px solid #e0e0e0;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    background: white;
+}
+
+.settings-custom-select:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.settings-current {
+    margin-top: 14px;
+    padding: 10px 14px;
+    background: #f0f4ff;
+    border: 1px solid #c3d9ff;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #667eea;
+    text-align: center;
+    font-weight: 500;
 }

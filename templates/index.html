@@ -10,7 +10,7 @@
     <!-- ========== 登录/注册页面（默认显示）========== -->
     <div id="auth-page" class="auth-page">
         <div class="auth-brand">
-            <h1 class="auth-app-name">思维便签</h1>
+            <img src="static/feather_R.png" class="auth-logo" alt="logo">
             <p class="auth-slogan">让思考留下痕迹</p>
         </div>
 
@@ -75,6 +75,7 @@
                         <div class="user-menu-item" onclick="closeUserMenu(); openExportModal()">导出</div>
                         <div class="user-menu-item" onclick="closeUserMenu(); document.getElementById('import-file').click()">导入</div>
                         <div class="user-menu-item" onclick="closeUserMenu(); openTagManageModal()">标签管理</div>
+                        <div class="user-menu-item" onclick="closeUserMenu(); openSettingsModal()">设置</div>
                         <div class="user-menu-item logout" onclick="closeUserMenu(); logout()">退出</div>
                     </div>
                 </div>
@@ -247,16 +248,71 @@
         </div>
     </div>
 
+    <!-- ========== 设置弹窗 ========== -->
+    <div id="settings-modal" class="modal-overlay" style="display:none">
+        <div class="modal-card">
+            <h3>设置</h3>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>登录超时时间</label>
+                    <div class="settings-timeout-options">
+                        <button class="settings-timeout-btn" data-value="1800" onclick="selectTimeoutPreset(this)">30分钟</button>
+                        <button class="settings-timeout-btn" data-value="14400" onclick="selectTimeoutPreset(this)">4小时</button>
+                        <button class="settings-timeout-btn" data-value="86400" onclick="selectTimeoutPreset(this)">1天</button>
+                        <button class="settings-timeout-btn" data-value="604800" onclick="selectTimeoutPreset(this)">7天</button>
+                    </div>
+                    <div class="settings-custom-row">
+                        <span class="settings-custom-label">自定义</span>
+                        <input type="number" id="settings-custom-value" class="settings-custom-input" placeholder="数字" min="1" oninput="selectTimeoutCustom()">
+                        <select id="settings-custom-unit" class="settings-custom-select" onchange="selectTimeoutCustom()">
+                            <option value="60">分钟</option>
+                            <option value="3600">小时</option>
+                            <option value="86400">天</option>
+                        </select>
+                    </div>
+                    <div id="settings-current-timeout" class="settings-current"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn cancel" onclick="closeSettingsModal()">取消</button>
+                <button class="modal-btn confirm" onclick="saveSettings()">保存</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // ==================== 用户登录相关 ====================
         let currentUser = null;
+        const DEFAULT_TIMEOUT = 3 * 24 * 3600; // 默认3天（秒）
+
+        // 获取当前用户的超时时间（秒）
+        function getTimeoutSeconds() {
+            const openid = localStorage.getItem('openid');
+            if (!openid) return DEFAULT_TIMEOUT;
+            const stored = localStorage.getItem('timeout_' + openid);
+            return stored ? parseInt(stored) : DEFAULT_TIMEOUT;
+        }
 
         // 检查是否已登录，控制页面显示
         function checkLogin() {
             const openid = localStorage.getItem('openid');
             const userInfo = localStorage.getItem('userInfo');
+            const loginTime = localStorage.getItem('loginTime');
 
             if (openid && userInfo) {
+                // 检查是否超时
+                if (loginTime) {
+                    const elapsed = (Date.now() - parseInt(loginTime)) / 1000;
+                    const timeout = getTimeoutSeconds();
+                    if (elapsed > timeout) {
+                        // 已超时，清除登录状态
+                        localStorage.removeItem('openid');
+                        localStorage.removeItem('userInfo');
+                        localStorage.removeItem('loginTime');
+                        showAuthPage();
+                        return false;
+                    }
+                }
                 currentUser = JSON.parse(userInfo);
                 currentUser.openid = openid;
                 showAppPage();
@@ -332,6 +388,7 @@
                     // 保存登录信息
                     localStorage.setItem('openid', data.openid);
                     localStorage.setItem('userInfo', JSON.stringify(data));
+                    localStorage.setItem('loginTime', Date.now().toString());
                     currentUser = data;
                     currentUser.openid = data.openid;
 
@@ -405,6 +462,7 @@
 
             localStorage.removeItem('openid');
             localStorage.removeItem('userInfo');
+            localStorage.removeItem('loginTime');
             currentUser = null;
             showAuthPage();
         }
@@ -1566,6 +1624,89 @@
             } catch (err) {
                 alert('网络错误，请重试');
             }
+        }
+        
+        // ==================== 设置弹窗 ====================
+        
+        let selectedTimeoutSeconds = DEFAULT_TIMEOUT;
+        
+        // 打开设置弹窗
+        function openSettingsModal() {
+            selectedTimeoutSeconds = getTimeoutSeconds();
+            // 重置按钮状态
+            document.querySelectorAll('.settings-timeout-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('settings-custom-value').value = '';
+            document.getElementById('settings-custom-unit').value = '3600';
+            // 检查是否匹配预设
+            const presetBtn = document.querySelector(`.settings-timeout-btn[data-value="${selectedTimeoutSeconds}"]`);
+            if (presetBtn) {
+                presetBtn.classList.add('active');
+            } else {
+                // 自定义值，回填输入框
+                const unitSelect = document.getElementById('settings-custom-unit');
+                const units = [{v: 86400, n: '天'}, {v: 3600, n: '小时'}, {v: 60, n: '分钟'}];
+                for (let u of units) {
+                    if (selectedTimeoutSeconds % u.v === 0) {
+                        document.getElementById('settings-custom-value').value = selectedTimeoutSeconds / u.v;
+                        unitSelect.value = u.v;
+                        break;
+                    }
+                }
+            }
+            updateCurrentTimeoutDisplay();
+            document.getElementById('settings-modal').style.display = 'flex';
+        }
+        
+        // 关闭设置弹窗
+        function closeSettingsModal() {
+            document.getElementById('settings-modal').style.display = 'none';
+        }
+        
+        // 选择预设超时
+        function selectTimeoutPreset(btn) {
+            document.querySelectorAll('.settings-timeout-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            selectedTimeoutSeconds = parseInt(btn.dataset.value);
+            document.getElementById('settings-custom-value').value = '';
+            updateCurrentTimeoutDisplay();
+        }
+        
+        // 自定义超时输入
+        function selectTimeoutCustom() {
+            document.querySelectorAll('.settings-timeout-btn').forEach(b => b.classList.remove('active'));
+            const value = parseInt(document.getElementById('settings-custom-value').value);
+            const unit = parseInt(document.getElementById('settings-custom-unit').value);
+            if (value && value > 0 && unit) {
+                selectedTimeoutSeconds = value * unit;
+            }
+            updateCurrentTimeoutDisplay();
+        }
+        
+        // 显示当前选择的超时时间
+        function updateCurrentTimeoutDisplay() {
+            const seconds = selectedTimeoutSeconds;
+            let text;
+            if (seconds % 86400 === 0) {
+                text = `${seconds / 86400} 天`;
+            } else if (seconds % 3600 === 0) {
+                text = `${seconds / 3600} 小时`;
+            } else if (seconds % 60 === 0) {
+                text = `${seconds / 60} 分钟`;
+            } else {
+                text = `${seconds} 秒`;
+            }
+            document.getElementById('settings-current-timeout').textContent = '当前设置：' + text;
+        }
+        
+        // 保存设置
+        function saveSettings() {
+            const openid = localStorage.getItem('openid');
+            if (!openid) return;
+            localStorage.setItem('timeout_' + openid, selectedTimeoutSeconds.toString());
+            // 更新登录时间，使新设置立即生效
+            localStorage.setItem('loginTime', Date.now().toString());
+            closeSettingsModal();
+            alert('设置已保存');
         }
         
         // HTML转义
